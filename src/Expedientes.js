@@ -402,6 +402,7 @@ export default function Expedientes({ miRol, miAgente }) {
       }, { onConflict: 'movimiento_id,tipo_documento' }).select().single();
       setSubiendoTipo(null);
       if (!error && data) { setDocsPorMovimiento(prev => ({ ...prev, [movimientoId]: { ...(prev[movimientoId] || {}), [tipoId]: data } })); notificarAdminsDocumentoPendiente(movimientoId); }
+      else if (error) alert('El archivo se subió pero no se pudo registrar: ' + error.message);
       return;
     }
 
@@ -419,6 +420,7 @@ export default function Expedientes({ miRol, miAgente }) {
 
     setSubiendoTipo(null);
     if (!error && data) { setDocsPorMovimiento(prev => ({ ...prev, [movimientoId]: { ...(prev[movimientoId] || {}), [tipoId]: data } })); notificarAdminsDocumentoPendiente(movimientoId); }
+    else if (error) alert('El archivo se subió pero no se pudo registrar: ' + error.message);
   };
 
   // FIX: quita un archivo individual de un documento de varios archivos
@@ -437,6 +439,7 @@ export default function Expedientes({ miRol, miAgente }) {
       estado_revision: 'pendiente', motivo_rechazo: null, revisado_por: null, fecha_revision: null,
     }, { onConflict: 'movimiento_id,tipo_documento' }).select().single();
     if (!error && data) setDocsPorMovimiento(prev => ({ ...prev, [movimientoId]: { ...(prev[movimientoId] || {}), [tipoId]: data } }));
+    else if (error) alert('No se pudo actualizar el documento: ' + error.message);
   };
 
   const handleToggleNoAplica = async (movimientoId, tipoId, valor) => {
@@ -445,6 +448,7 @@ export default function Expedientes({ miRol, miAgente }) {
       subido_por: miAgente?.correo || '', fecha_subida: new Date().toISOString(),
     }, { onConflict: 'movimiento_id,tipo_documento' }).select().single();
     if (!error && data) setDocsPorMovimiento(prev => ({ ...prev, [movimientoId]: { ...(prev[movimientoId] || {}), [tipoId]: data } }));
+    else if (error) alert('No se pudo guardar: ' + error.message);
   };
 
   const handleVerDocumento = async (path) => {

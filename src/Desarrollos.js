@@ -238,12 +238,13 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
       for (let i = 1; i <= (form.num_estructuras || 1); i++) {
         const nombreTorre = `${form.tipo_estructura} ${i}`;
         const datos = estructurasData[nombreTorre] || estructuraVacia();
-        await supabase.from('desarrollo_estructuras').upsert({
+        const { error: errorEstructura } = await supabase.from('desarrollo_estructuras').upsert({
           desarrollo_id: desarrolloId, nombre: nombreTorre,
           datos_bancarios: datos.datos_bancarios || null,
           fecha_entrega: datos.fecha_entrega || null,
           brochure_url: datos.brochure_url || null,
         }, { onConflict: 'desarrollo_id,nombre' });
+        if (errorEstructura) alert(`No se pudieron guardar los datos de ${nombreTorre}: ` + errorEstructura.message);
       }
     }
 
