@@ -296,7 +296,11 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const docsDe = (movimientoId) => docsPorMovimiento[movimientoId] || {};
 
-  const esVendedorDe = (m) => nombreCompleto && m.vendedor === nombreCompleto;
+  // FIX: comparar por correo (estable) en vez de solo por nombre — si el
+  // agente corrige su nombre/apellidos en "Mi cuenta" después de registrar
+  // un movimiento, el nombre guardado ahí deja de coincidir con el actual
+  // y el expediente se queda huérfano (esMio pasa a false sin motivo).
+  const esVendedorDe = (m) => (miAgente?.correo && m.vendedor_correo === miAgente.correo) || (nombreCompleto && m.vendedor === nombreCompleto);
   const esDeMiProyecto = (m) => misProyectos.includes(m.desarrollo_nombre);
 
   // FIX: los 11 documentos del asesor se dan por completos cuando están
