@@ -2,7 +2,7 @@
 // para verificar que las notificaciones vengan realmente de nuestro
 // servidor. La llave privada correspondiente vive SOLO en el Edge
 // Function de Supabase (nunca en el frontend).
-const VAPID_PUBLIC_KEY = 'BIW4G3lPysE96Qv2fEZYYCJMmfJeGi8yU6HIwMoeE7l10VD8LreIxAGBxpBSU7nvTh8ICOiDfNm8K2mTTGNb5x8';
+const VAPID_PUBLIC_KEY = 'BBgaHWCPPykyGv-xLS2Kobesqn4RIOXin8-JXzvpyRta4zYH2lbkvDCaJNrCgnywpQ6uLNhW8kye9clxOI2JSwQ';
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
