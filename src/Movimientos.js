@@ -5,7 +5,7 @@ const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 // FIX: se agrega "Especial" — para negociaciones que no entran en las
 // políticas de los demás planes (caso a caso).
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
-const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario'];
+const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario', 'Showroom'];
 // FIX: Gerente Externo entra a la misma ventana martes-lunes que los demás Gerentes
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Gerente Externo'];
 
