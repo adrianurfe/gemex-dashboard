@@ -6,7 +6,6 @@ import Agentes from './Agentes';
 import Negocios from './Negocios';
 import Movimientos from './Movimientos';
 import Objetivos from './Objetivos';
-import ReportesAutomaticos from './ReportesAutomaticos';
 import PushNotificaciones from './PushNotificaciones';
 import TendenciasProducto from './TendenciasProducto';
 import BuyerPersona from './BuyerPersona';
@@ -17,7 +16,7 @@ import Expedientes from './Expedientes';
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, Building, LineChart,
-  ArrowLeftRight, FileText, Mail, ShieldCheck, Settings, LogOut, Flame, UserCheck,
+  ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck,
 } from 'lucide-react';
 
 const MENU_COMPLETO = [
@@ -32,7 +31,6 @@ const MENU_COMPLETO = [
     { id: 'movimientos', label: 'Movimientos', icon: 'movimientos' },
     { id: 'historial', label: 'Historial', icon: 'historial' },
     { id: 'objetivos', label: 'Objetivos', icon: 'objetivos' },
-    { id: 'reportes_auto', label: 'Reportes Automáticos', icon: 'reportes_auto' },
     { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
     { id: 'buyer_persona', label: 'Buyer Persona', icon: 'buyer_persona' },
   ]},
@@ -93,7 +91,6 @@ const MENU_ICONS = {
   dashboard_dir: <LineChart size={18} />,
   historial: <FileText size={18} />,
   objetivos: <Target size={18} />,
-  reportes_auto: <Mail size={18} />,
   tendencias_producto: <Flame size={18} />,
   buyer_persona: <UserCheck size={18} />,
 };
@@ -142,7 +139,6 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             const submenuFiltrado = (item.submenu || []).filter(s => {
               if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
               if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo';
-              if (s.id === 'reportes_auto') return miRol === 'Super Admin' || miRol === 'Admin';
               if (s.id === 'tendencias_producto') return miRol === 'Super Admin';
               if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo';
               return true;
@@ -716,7 +712,6 @@ function App() {
       case 'dashboard_dir': return <DashboardDireccion miRol={miRol} miAgente={miAgente} />;
       case 'historial': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo') ? <HistorialMovimientos miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'objetivos': return <Objetivos miRol={miRol} miAgente={miAgente} />;
-      case 'reportes_auto': return <ReportesAutomaticos miRol={miRol} />;
       case 'tendencias_producto': return miRol === 'Super Admin' ? <TendenciasProducto /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
         return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo')
