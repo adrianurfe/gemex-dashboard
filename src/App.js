@@ -126,9 +126,9 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
         </div>
         {nombre && (
           <div style={{ padding: '12px 16px', borderBottom: '0.5px solid rgba(255,255,255,0.06)' }}>
-            <div style={{ fontSize: '11px', color: '#555' }}>Bienvenido,</div>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.45)' }}>Bienvenido,</div>
             <div style={{ fontSize: '13px', color: '#ccc', fontWeight: '500', marginTop: '2px' }}>{nombre}</div>
-            <div style={{ fontSize: '11px', color: '#444', marginTop: '1px' }}>
+            <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', marginTop: '1px' }}>
               {miAgente?.equipo === 'Gemex' && miAgente?.codigo_agente ? miAgente.codigo_agente : miRol}
             </div>
           </div>
@@ -160,7 +160,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
                     </span>
                     {item.label}
                   </div>
-                  {tieneSubmenu && <span style={{ fontSize: '10px', color: '#555' }}>{estaAbierto ? '▾' : '▸'}</span>}
+                  {tieneSubmenu && <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.45)' }}>{estaAbierto ? '▾' : '▸'}</span>}
                   {item.id === 'dashboard' && miRol === 'Super Admin' && (
                     <span onClick={e => { e.stopPropagation(); onToggleRankingBs(); }}
                       title={rankingBsVisible ? 'Visible para todos — click para ocultar' : 'Oculto para los demás roles — click para mostrar'}
@@ -196,7 +196,7 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             Mi cuenta
           </button>
           <button onClick={onLogout}
-            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#555', cursor: 'pointer', fontSize: '14px', textAlign: 'left' }}>
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '10px', padding: '12px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: '14px', textAlign: 'left' }}>
             <span style={{ display: 'flex', alignItems: 'center' }}><LogOut size={18} /></span>
             Cerrar sesión
           </button>
