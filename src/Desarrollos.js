@@ -214,13 +214,22 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
   const handleGuardar = async () => {
     if (!form.nombre.trim()) return;
     setGuardando(true);
+    // fecha_entrega es columna `date` — '' no es una fecha válida para Postgres.
+    const payload = { ...form, fecha_entrega: form.fecha_entrega || null };
     let desarrolloId = editando;
     const esNuevo = !editando;
+    let error;
     if (editando) {
-      await supabase.from('desarrollos').update(form).eq('id', editando);
+      ({ error } = await supabase.from('desarrollos').update(payload).eq('id', editando));
     } else {
-      const { data, error } = await supabase.from('desarrollos').insert([form]).select().single();
+      const { data, error: insertError } = await supabase.from('desarrollos').insert([payload]).select().single();
+      error = insertError;
       if (!error && data) desarrolloId = data.id;
+    }
+    if (error) {
+      alert('No se pudo guardar el desarrollo: ' + error.message);
+      setGuardando(false);
+      return;
     }
     if (esNuevo && desarrolloId) await sincronizarDesarrolloNuevoATodos(form.nombre);
 
