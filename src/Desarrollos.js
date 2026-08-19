@@ -322,6 +322,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
       if (tipo === 'logo') setForm(f => ({ ...f, logo_url: publicUrl }));
       else if (tipo === 'portada') setForm(f => ({ ...f, portada_url: publicUrl }));
       else setForm(f => ({ ...f, brochure_url: publicUrl }));
+    } else {
+      alert('No se pudo subir el archivo: ' + error.message);
     }
     if (tipo === 'logo') setSubiendoLogo(false);
     else if (tipo === 'portada') setSubiendoPortada(false);
@@ -342,6 +344,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
     if (!error) {
       const { data: { publicUrl } } = supabase.storage.from('desarrollos').getPublicUrl(fileName);
       setForm(f => ({ ...f, galeria_web: [...(f.galeria_web || []), publicUrl] }));
+    } else {
+      alert('No se pudo subir la foto: ' + error.message);
     }
     setSubiendoFotoWeb(false);
   };
@@ -360,6 +364,8 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
     if (!error) {
       const { data: { publicUrl } } = supabase.storage.from('desarrollos').getPublicUrl(fileName);
       setEstructurasData(prev => ({ ...prev, [nombreTorre]: { ...(prev[nombreTorre] || estructuraVacia()), brochure_url: publicUrl } }));
+    } else {
+      alert('No se pudo subir el brochure: ' + error.message);
     }
     setSubiendoBrochureTorre(false);
   };
