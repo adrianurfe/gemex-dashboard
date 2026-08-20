@@ -971,7 +971,7 @@ const { data } = await query.limit(5000);
       )}
 
       {unidadDetalle && isMobile && (
-        <div style={{ position: 'fixed', top: 0, right: 0, width: '100%', height: '100%', background: '#fff', zIndex: 1000, display: 'flex', flexDirection: 'column', maxHeight: '100vh' }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, width: '100%', height: '100%', background: '#fff', zIndex: 1000, display: 'flex', flexDirection: 'column', maxHeight: '100dvh' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 style={{ fontSize: '16px', fontWeight: '500', margin: 0 }}>Unidad #{unidadDetalle.numero}</h3>
             <button onClick={() => setUnidadDetalle(null)} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#888' }}>×</button>
@@ -1065,7 +1065,7 @@ const { data } = await query.limit(5000);
       )}
 
       {showForm && puedeEditarInventario && (
-        <div style={{ position: 'fixed', top: 0, right: 0, width: isMobile ? '100%' : '360px', height: '100vh', background: '#fff', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ position: 'fixed', top: 0, right: 0, width: isMobile ? '100%' : '360px', height: '100dvh', background: '#fff', boxShadow: '-4px 0 20px rgba(0,0,0,0.1)', zIndex: 1000, display: 'flex', flexDirection: 'column' }}>
           <div style={{ padding: '1.25rem 1.5rem', borderBottom: '0.5px solid #f0f0f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
             <h3 style={{ fontSize: '16px', fontWeight: '500', margin: 0 }}>{editandoId ? 'Editar unidad' : 'Cargar unidad'}</h3>
             <button onClick={() => { setShowForm(false); setEditandoId(null); }} style={{ background: 'none', border: 'none', fontSize: '22px', cursor: 'pointer', color: '#888' }}>×</button>

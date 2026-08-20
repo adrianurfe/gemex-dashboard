@@ -11,3 +11,13 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
+
+/* Safari en iOS hace zoom automático al enfocar un input/select/textarea
+   con font-size menor a 16px (Chrome no lo hace). La app usa fuentes más
+   chicas por densidad de la UI, así que en móvil se fuerza el mínimo de
+   16px solo en campos de formulario para evitar el zoom no deseado. */
+@media screen and (max-width: 767px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
