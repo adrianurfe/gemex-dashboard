@@ -1043,7 +1043,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
               </>
             )}
 
-            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', position: isMobile ? 'sticky' : 'static', bottom: isMobile ? '1rem' : 'auto' }}>
+            <div style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end' }}>
               <button onClick={handleGuardar} disabled={guardando}
                 style={{ ...btnPrimary, padding: isMobile ? '14px 32px' : '12px 32px', fontSize: isMobile ? '15px' : '13px', width: isMobile ? '100%' : 'auto', justifyContent: 'center' }}>
                 {guardando ? 'Guardando...' : editando ? 'Guardar cambios' : 'Crear desarrollo'}
