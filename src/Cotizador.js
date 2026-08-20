@@ -28,14 +28,16 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
   const listaUnidades = unidadesMultiple?.length > 0 ? unidadesMultiple : (unidad ? [unidad] : []);
   const esComparacion = listaUnidades.length > 1;
 
-  useEffect(() => { cargarPlanes(); cargarAsesor(); cargarContactos(); cargarDatosBancariosTorre(); registrarLog(); }, []);
+  useEffect(() => { cargarPlanes(); cargarAsesor(); cargarContactos(); cargarDatosBancariosTorre(); }, []);
 
-  // FIX: registra en `cotizaciones_log` cada unidad que se muestra al
-  // abrir el cotizador (una fila por unidad, incluso en comparación) —
-  // se cuenta en cuanto se ABRE la pantalla, sin importar si luego se
-  // descarga o comparte el PDF. Sirve para medir qué producto se enseña
-  // más y detectar unidades "frías" (nunca cotizadas).
+  // FIX: registra en `cotizaciones_log` cada unidad de la cotización,
+  // pero solo cuando hay un contacto asignado y la cotización se
+  // descarga o se reenvía — antes se contaba con solo ABRIR el
+  // cotizador, sin contacto ni acción real, lo que inflaba el conteo en
+  // Tendencias con unidades que un agente abrió para mirar precios pero
+  // nunca llegó a enviar a nadie.
   const registrarLog = async () => {
+    if (!contactoSeleccionado) return;
     try {
       const { data: { user } } = await supabase.auth.getUser();
       let agenteNombre = '';
@@ -54,6 +56,8 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
         tipologia: u.tipologia || null,
         nivel: u.nivel || null,
         precio_lista: u.precio_lista || null,
+        contacto_id: contactoSeleccionado.id,
+        contacto_nombre: `${contactoSeleccionado.nombres} ${contactoSeleccionado.apellidos}`.trim(),
       }));
       if (filas.length > 0) await supabase.from('cotizaciones_log').insert(filas);
     } catch (err) {
@@ -206,6 +210,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     a.download = nombre;
     a.click();
     URL.revokeObjectURL(url);
+    await registrarLog();
     setGenerando(false);
   };
 
@@ -217,6 +222,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
       try {
         await navigator.share({ files: [file], title: nombre });
+        await registrarLog();
       } catch (err) {
         if (err.name !== 'AbortError') {
           const url = URL.createObjectURL(blob);
@@ -225,7 +231,9 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
           a.download = nombre;
           a.click();
           URL.revokeObjectURL(url);
+          await registrarLog();
         }
+        // AbortError: el usuario canceló el share sheet, no se cuenta como reenvío
       }
     } else {
       const url = URL.createObjectURL(blob);
@@ -234,6 +242,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
       a.download = nombre;
       a.click();
       URL.revokeObjectURL(url);
+      await registrarLog();
     }
     setCompartiendo(false);
   };

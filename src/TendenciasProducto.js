@@ -16,9 +16,10 @@ function useIsMobile() {
 // FIX: reporte nuevo — qué producto (unidad/tipología) se está enseñando
 // más y cuáles están "frías" (nunca cotizadas), más quiénes son los
 // agentes más activos cotizando. Se alimenta de cotizaciones_log, que se
-// llena automáticamente cada vez que alguien abre el Cotizador (ver
-// registrarLog en Cotizador.js). Solo Super Admin puede ver esto — la
-// RLS de cotizaciones_log ya lo restringe también a nivel de base.
+// llena solo cuando el agente tiene un contacto asignado en el Cotizador
+// y descarga o comparte el PDF (ver registrarLog en Cotizador.js) — abrir
+// el cotizador a mirar precios no cuenta. Solo Super Admin puede ver
+// esto — la RLS de cotizaciones_log ya lo restringe también a nivel de base.
 export default function TendenciasProducto() {
   const isMobile = useIsMobile();
   const [tab, setTab] = useState('productos');
