@@ -21,7 +21,80 @@ const DOCS_ASESOR = [
   { id: 'documento_adicional', label: 'Documento adicional', opcional: true, multiple: true, maxArchivos: 15, aceptaImagen: true, nota: 'Solo si aplica algún documento adicional no contemplado arriba' },
 ];
 const DOC_ORDEN_CONTRATO = { id: 'orden_contrato', label: 'Orden de contrato' };
-const TODOS_LOS_DOCS = [...DOCS_ASESOR, DOC_ORDEN_CONTRATO];
+
+// FIX: checklist de documentos por tipo de compra (Infonavit, Fovissste,
+// Bancario, Cofinavit) — viene del checklist oficial de Los Arrayanes.
+// Contado sigue usando DOCS_ASESOR tal cual (sin Titular/Coacreditado).
+// Los documentos base de identidad se repiten para Titular y, si aplica,
+// Coacreditado — con id prefijado `coac_` para el coacreditado, así el
+// resto del sistema (que indexa documentos por `tipo_documento` en un
+// mapa plano) no necesita cambiar de forma.
+const docsBaseIdentidad = (prefix) => [
+  { id: `${prefix}ine_pasaporte`, label: 'Identificación Oficial Vigente (INE o Pasaporte)', multiple: true, maxArchivos: 4, nota: 'Hasta 4 archivos (ambas hojas del INE, o pasaporte + hojas adicionales)', avisoRojo: 'SOLO DOCUMENTOS ESCANEADOS A COLOR, NO SE ACEPTARÁN ESCANEOS CON EL CELULAR O FOTOGRAFIAS' },
+  { id: `${prefix}acta_nacimiento`, label: 'Acta de Nacimiento', avisoRojo: 'ACTA DESCARGADA EN PDF O ESCANEO DEL ACTA FISICA, NO FOTOS O ESCANEO DE CELULAR' },
+  { id: `${prefix}acta_matrimonio`, label: 'Acta de Matrimonio (si aplica)', opcional: true, avisoRojo: 'ACTA DESCARGADA EN PDF O ESCANEO DEL ACTA FISICA, NO FOTOS O ESCANEO DE CELULAR' },
+  { id: `${prefix}curp`, label: 'CURP', avisoRojo: 'CURP DESCARGADA EN PDF O ESCANEO DE LA CURP FISICA, NO FOTOS O ESCANEO DE CELULAR' },
+  { id: `${prefix}constancia_fiscal`, label: 'Constancia de Situación Fiscal (RFC)', avisoRojo: 'CONSTANCIA DESCARGADA EN PDF O ESCANEO DE LA CONSTANCIA FISICA COMPLETA, NO FOTOS O ESCANEO DE CELULAR' },
+  { id: `${prefix}comprobante_domicilio`, label: 'Comprobante de Domicilio (no mayor a 3 meses)', avisoRojo: 'RECIBO DESCARGADO PDF O ESCANEO DEL RECIBO FISICO, NO FOTOS O ESCANEO DE CELULAR' },
+];
+
+const DOC_DEFS_FINANCIADO = {
+  precalificacion_infonavit: { label: 'Precalificación Infonavit' },
+  constancia_taller: { label: 'Constancia del Taller "Saber Más para Decidir Mejor"' },
+  estado_cuenta_afore: { label: 'Estado de Cuenta de AFORE' },
+  validacion_credito_sofom: { label: 'Validación Crédito SOFOM' },
+  ultimo_talon_pago: { label: 'Último Talón de Pago' },
+  carta_autorizacion_banco: { label: 'Carta Autorización Banco' },
+  carta_autorizacion_cofinavit: { label: 'Carta Autorización Cofinavit' },
+  liquidacion_gemex: { label: 'Liquidación Gemex' },
+};
+
+// Por tipo de compra: qué documentos específicos van para Titular y
+// Coacreditado (además de los de identidad, que siempre van), y cuáles
+// son EXCLUSIVOS del Titular (no se piden al coacreditado).
+const DOCS_FINANCIADO_ESPECIFICOS = {
+  Infonavit: {
+    comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
+    soloTitular: ['liquidacion_gemex'],
+    referenciasPersonales: true,
+  },
+  Fovissste: {
+    comunes: ['validacion_credito_sofom', 'ultimo_talon_pago'],
+    soloTitular: ['liquidacion_gemex'],
+    referenciasPersonales: false,
+  },
+  Bancario: {
+    comunes: ['carta_autorizacion_banco'],
+    soloTitular: ['liquidacion_gemex'],
+    referenciasPersonales: false,
+  },
+  Cofinavit: {
+    comunes: ['precalificacion_infonavit', 'constancia_taller', 'estado_cuenta_afore'],
+    soloTitular: ['carta_autorizacion_cofinavit', 'liquidacion_gemex'],
+    referenciasPersonales: true,
+  },
+};
+
+// Lista de documentos a pedir para una persona (titular/coacreditado) de
+// un movimiento, según su tipo_compra. Contado (o sin tipo_compra, para
+// movimientos viejos de antes de este cambio) sigue usando DOCS_ASESOR.
+const docsRequeridos = (movimiento, persona = 'titular') => {
+  const cfg = DOCS_FINANCIADO_ESPECIFICOS[movimiento?.tipo_compra];
+  if (!cfg) return persona === 'titular' ? DOCS_ASESOR : [];
+  const prefix = persona === 'coacreditado' ? 'coac_' : '';
+  const base = docsBaseIdentidad(prefix);
+  const comunes = cfg.comunes.map(id => ({ id: `${prefix}${id}`, ...DOC_DEFS_FINANCIADO[id] }));
+  const soloTitular = persona === 'titular' ? cfg.soloTitular.map(id => ({ id, ...DOC_DEFS_FINANCIADO[id] })) : [];
+  return [...base, ...comunes, ...soloTitular];
+};
+
+// Lista completa para conteos/ZIP: Titular + Coacreditado (si aplica) +
+// Orden de contrato.
+const docsRequeridosCompletos = (movimiento) => {
+  const titular = docsRequeridos(movimiento, 'titular');
+  const coacreditado = movimiento?.tiene_coacreditado ? docsRequeridos(movimiento, 'coacreditado') : [];
+  return [...titular, ...coacreditado, DOC_ORDEN_CONTRATO];
+};
 
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 const ROLES_ADMIN = ['Super Admin', 'Admin'];
@@ -101,6 +174,13 @@ export default function Expedientes({ miRol, miAgente }) {
   const [msgBP, setMsgBP] = useState('');
   const [buscarOcupacion, setBuscarOcupacion] = useState('');
   const [showOcupaciones, setShowOcupaciones] = useState(false);
+  // FIX: coacreditado (solo aplica a compras financiadas) y referencias
+  // personales (solo Infonavit/Cofinavit) — igual que Buyer Persona, se
+  // editan en memoria y solo se guardan al dar click en "Guardar".
+  const [formCoacreditado, setFormCoacreditado] = useState({ tiene_coacreditado: false, coacreditado_nombre: '' });
+  const [formReferencias, setFormReferencias] = useState({ referencia1_nombre: '', referencia1_telefono: '', referencia2_nombre: '', referencia2_telefono: '' });
+  const [guardandoExtra, setGuardandoExtra] = useState(false);
+  const [msgExtra, setMsgExtra] = useState('');
   // FIX: Gerente Externo solo debe ver/subir expedientes de SU EQUIPO
   // (él + agentes_cargo), no de todo el proyecto como los demás Gerentes.
   // Se resuelven correos + nombres del equipo para cruzar contra
@@ -141,6 +221,15 @@ export default function Expedientes({ miRol, miAgente }) {
   }, [miRol, miAgente]);
 
   useEffect(() => { cargarContactoBuyerPersona(movSel?.contacto_id); setBuscarOcupacion(''); setShowOcupaciones(false); }, [movSel]);
+
+  useEffect(() => {
+    setFormCoacreditado({ tiene_coacreditado: !!movSel?.tiene_coacreditado, coacreditado_nombre: movSel?.coacreditado_nombre || '' });
+    setFormReferencias({
+      referencia1_nombre: movSel?.referencia1_nombre || '', referencia1_telefono: movSel?.referencia1_telefono || '',
+      referencia2_nombre: movSel?.referencia2_nombre || '', referencia2_telefono: movSel?.referencia2_telefono || '',
+    });
+    setMsgExtra('');
+  }, [movSel?.id]);
 
   useEffect(() => {
     const cargarEquipoExterno = async () => {
@@ -266,6 +355,40 @@ export default function Expedientes({ miRol, miAgente }) {
     setTimeout(() => setMsgBP(''), 3000);
   };
 
+  // FIX: guarda tiene_coacreditado/coacreditado_nombre en el movimiento —
+  // determina si se muestra la segunda columna de documentos.
+  const handleGuardarCoacreditado = async () => {
+    if (!movSel) return;
+    setGuardandoExtra(true); setMsgExtra('');
+    const { data, error } = await supabase.from('movimientos').update({
+      tiene_coacreditado: formCoacreditado.tiene_coacreditado,
+      coacreditado_nombre: formCoacreditado.tiene_coacreditado ? (formCoacreditado.coacreditado_nombre || null) : null,
+    }).eq('id', movSel.id).select().single();
+    setGuardandoExtra(false);
+    if (error) { setMsgExtra('❌ Error al guardar: ' + error.message); return; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+    setMsgExtra('✅ Guardado correctamente');
+    setTimeout(() => setMsgExtra(''), 3000);
+  };
+
+  // FIX: guarda las dos referencias personales (nombre + teléfono) — solo
+  // texto, no es un documento, así que vive en el movimiento directamente.
+  const handleGuardarReferencias = async () => {
+    if (!movSel) return;
+    setGuardandoExtra(true); setMsgExtra('');
+    const { data, error } = await supabase.from('movimientos').update({
+      referencia1_nombre: formReferencias.referencia1_nombre || null, referencia1_telefono: formReferencias.referencia1_telefono || null,
+      referencia2_nombre: formReferencias.referencia2_nombre || null, referencia2_telefono: formReferencias.referencia2_telefono || null,
+    }).eq('id', movSel.id).select().single();
+    setGuardandoExtra(false);
+    if (error) { setMsgExtra('❌ Error al guardar: ' + error.message); return; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+    setMsgExtra('✅ Guardado correctamente');
+    setTimeout(() => setMsgExtra(''), 3000);
+  };
+
   const cargarResponsables = async () => {
     const { data } = await supabase.from('configuracion').select('valor').eq('clave', 'expedientes_responsables_correos').limit(1);
     const lista = data && data.length > 0 && data[0].valor ? data[0].valor.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -305,19 +428,19 @@ export default function Expedientes({ miRol, miAgente }) {
 
   // FIX: los 11 documentos del asesor se dan por completos cuando están
   // subidos Y aprobados (referencia_bancaria puede estar marcada "no aplica")
-  const docsAsesorCompletos = (movimientoId) => {
-    const docs = docsDe(movimientoId);
-    return DOCS_ASESOR.every(t => {
+  const docsAsesorCompletos = (movimiento) => {
+    const docs = docsDe(movimiento.id);
+    return docsRequeridos(movimiento, 'titular').every(t => {
       const d = docs[t.id];
       if (t.opcional && d?.no_aplica) return true;
       return d?.archivo_path && d.estado_revision === 'aprobado';
     });
   };
 
-  const contarAprobados = (movimientoId) => {
-    const docs = docsDe(movimientoId);
+  const contarAprobados = (movimiento) => {
+    const docs = docsDe(movimiento.id);
     let n = 0;
-    TODOS_LOS_DOCS.forEach(t => {
+    docsRequeridosCompletos(movimiento).forEach(t => {
       const d = docs[t.id];
       if (d && ((t.opcional && d.no_aplica) || (d.archivo_path && d.estado_revision === 'aprobado'))) n++;
     });
@@ -378,7 +501,7 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const handleSubirDocumento = async (movimientoId, tipoId, file) => {
     if (!file) return;
-    const tipoInfo = TODOS_LOS_DOCS.find(t => t.id === tipoId);
+    const tipoInfo = docsRequeridosCompletos(movSel).find(t => t.id === tipoId);
     setSubiendoTipo(tipoId);
     const ext = file.name.split('.').pop();
     const path = `${movimientoId}/${tipoId}_${Date.now()}.${ext}`;
@@ -489,7 +612,7 @@ export default function Expedientes({ miRol, miAgente }) {
       setDocsPorMovimiento(prev => ({ ...prev, [movimientoId]: { ...(prev[movimientoId] || {}), [tipoId]: data } }));
       if (data.subido_por) {
         const mov = movimientos.find(m => m.id === movimientoId);
-        const tipoInfo = TODOS_LOS_DOCS.find(t => t.id === tipoId);
+        const tipoInfo = docsRequeridosCompletos(movSel).find(t => t.id === tipoId);
         const { count } = await supabase.from('expediente_documentos').select('id', { count: 'exact', head: true }).eq('subido_por', data.subido_por).eq('estado_revision', 'rechazado');
         enviarPush({
           correos: [data.subido_por],
@@ -511,7 +634,7 @@ export default function Expedientes({ miRol, miAgente }) {
       const zip = new JSZip();
       const docs = docsDe(movimiento.id);
       let algunoAgregado = false;
-      for (const tipo of TODOS_LOS_DOCS) {
+      for (const tipo of docsRequeridosCompletos(movimiento)) {
         const doc = docs[tipo.id];
         const archivos = getArchivosDoc(doc);
         for (let i = 0; i < archivos.length; i++) {
@@ -615,6 +738,100 @@ export default function Expedientes({ miRol, miAgente }) {
       ? (esDeMiEquipoExterno(movSel) && esDeMiProyecto(movSel))
       : (esGerente && esDeMiProyecto(movSel));
     const puedoRevisar = tab === 'descargar' && esAdmin;
+    const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
+    const esFinanciado = !!cfgFinanciado;
+    const docsTitular = docsRequeridos(movSel, 'titular');
+    const docsCoacreditado = movSel.tiene_coacreditado ? docsRequeridos(movSel, 'coacreditado') : [];
+
+    // FIX: card de un documento — se reutiliza para Titular y Coacreditado,
+    // ya que ambos viven en el mismo mapa plano de documentos (el id del
+    // coacreditado viene prefijado `coac_`).
+    const renderDocCard = (tipo) => {
+      const doc = docs[tipo.id];
+      const archivosMultiples = tipo.multiple ? getArchivosDoc(doc) : null;
+      const tieneArchivo = tipo.multiple ? archivosMultiples.length > 0 : !!doc?.archivo_path;
+      const estado = doc?.no_aplica ? null : (tieneArchivo ? (doc.estado_revision || 'pendiente') : null);
+      const puedeSubirEste = esMio && !archivado;
+      const aceptar = tipo.aceptaImagen ? 'application/pdf,image/*' : 'application/pdf';
+      return (
+        <div key={tipo.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            <div style={{ flex: 1, minWidth: '200px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{tipo.label}</div>
+              {tipo.nota && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{tipo.nota}</div>}
+              {tipo.avisoRojo && <div style={{ fontSize: '11px', color: '#A32D2D', fontWeight: '700', textTransform: 'uppercase', marginTop: '4px' }}>{tipo.avisoRojo}</div>}
+
+              {/* FIX: lista de archivos — varios para tipo.multiple, uno para el resto */}
+              {tipo.multiple ? (
+                archivosMultiples.length > 0 && (
+                  <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {archivosMultiples.map((a, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#888' }}>
+                        <span>📄 {a.nombre}</span>
+                        <button onClick={() => handleVerDocumento(a.path)} style={{ background: 'none', border: 'none', color: '#C0203A', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px', padding: 0 }}>Ver</button>
+                        {puedeSubirEste && (
+                          <button onClick={() => handleQuitarArchivoComprobante(movSel.id, tipo.id, i)} style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer', fontSize: '11px', padding: 0 }}>✕ Quitar</button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>📄 {doc.nombre_archivo}</div>
+              )}
+
+              {doc?.no_aplica && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Marcado como "No aplica"</div>}
+              {estado && (
+                <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', padding: '2px 10px', borderRadius: '20px', background: ESTADO_COLOR[estado].bg, color: ESTADO_COLOR[estado].color, fontWeight: '500' }}>
+                  {ESTADO_COLOR[estado].label}
+                </span>
+              )}
+              <RegistroValidacion doc={doc} />
+              {doc?.estado_revision === 'rechazado' && doc.motivo_rechazo && (
+                <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '6px', background: '#FCEBEB', padding: '8px 10px', borderRadius: '6px' }}>
+                  ✗ {doc.motivo_rechazo}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              {!tipo.multiple && doc?.archivo_path && (
+                <button onClick={() => handleVerDocumento(doc.archivo_path)}
+                  style={{ padding: '6px 12px', background: '#f5f5f5', color: '#333', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                  👁 Ver
+                </button>
+              )}
+              {puedeSubirEste && (!tipo.multiple || archivosMultiples.length < (tipo.maxArchivos || 10)) && (
+                <label style={{ padding: '6px 12px', background: '#C0203A', color: '#fff', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                  {subiendoTipo === tipo.id ? 'Subiendo...' : tipo.multiple ? '+ Agregar archivo' : doc?.archivo_path ? 'Reemplazar' : 'Subir archivo'}
+                  <input type='file' accept={aceptar} style={{ display: 'none' }}
+                    onChange={e => handleSubirDocumento(movSel.id, tipo.id, e.target.files[0])} />
+                </label>
+              )}
+              {puedeSubirEste && tipo.opcional && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888', cursor: 'pointer' }}>
+                  <input type='checkbox' checked={!!doc?.no_aplica} onChange={e => handleToggleNoAplica(movSel.id, tipo.id, e.target.checked)} />
+                  No aplica
+                </label>
+              )}
+              {puedoRevisar && tieneArchivo && (
+                <>
+                  {(!aplicaBuyerPersona(movSel) || buyerPersonaCompleto) && (
+                    <button onClick={() => handleAprobar(movSel.id, tipo.id)} disabled={revisando === tipo.id}
+                      style={{ padding: '6px 12px', background: '#EAF3DE', color: '#27500A', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                      ✓ Aprobar
+                    </button>
+                  )}
+                  <button onClick={() => handleRechazar(movSel.id, tipo.id)} disabled={revisando === tipo.id}
+                    style={{ padding: '6px 12px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
+                    ✗ Rechazar
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    };
 
     return (
       <div style={{ padding: isMobile ? '1rem' : '2rem', maxWidth: '780px' }}>
@@ -641,7 +858,12 @@ export default function Expedientes({ miRol, miAgente }) {
             )}
           </div>
         </div>
-        <div style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a2e', margin: '1.5rem 0 1rem' }}>EXPEDIENTE PERSONA FÍSICA</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: '1.5rem 0 1rem', flexWrap: 'wrap' }}>
+          <div style={{ fontSize: '15px', fontWeight: '600', color: '#1a1a2e' }}>EXPEDIENTE PERSONA FÍSICA</div>
+          {movSel.tipo_compra && (
+            <span style={{ fontSize: '11px', padding: '3px 10px', borderRadius: '20px', background: '#F3F0FF', color: '#8B5CF6', fontWeight: '500' }}>{movSel.tipo_compra}</span>
+          )}
+        </div>
 
         {archivado && (
           <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.5rem' }}>
@@ -650,92 +872,80 @@ export default function Expedientes({ miRol, miAgente }) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {DOCS_ASESOR.map(tipo => {
-            const doc = docs[tipo.id];
-            const archivosMultiples = tipo.multiple ? getArchivosDoc(doc) : null;
-            const tieneArchivo = tipo.multiple ? archivosMultiples.length > 0 : !!doc?.archivo_path;
-            const estado = doc?.no_aplica ? null : (tieneArchivo ? (doc.estado_revision || 'pendiente') : null);
-            const puedeSubirEste = esMio && !archivado;
-            const aceptar = tipo.aceptaImagen ? 'application/pdf,image/*' : 'application/pdf';
-            return (
-              <div key={tipo.id} style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-                  <div style={{ flex: 1, minWidth: '200px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e' }}>{tipo.label}</div>
-                    {tipo.nota && <div style={{ fontSize: '11px', color: '#aaa', marginTop: '2px' }}>{tipo.nota}</div>}
-                    {tipo.avisoRojo && <div style={{ fontSize: '11px', color: '#A32D2D', fontWeight: '700', textTransform: 'uppercase', marginTop: '4px' }}>{tipo.avisoRojo}</div>}
+          {esFinanciado && (
+            <div style={{ fontSize: '12px', fontWeight: '700', color: '#666', textTransform: 'uppercase', marginTop: '4px' }}>Documentación del Titular</div>
+          )}
+          {docsTitular.map(renderDocCard)}
 
-                    {/* FIX: lista de archivos — varios para tipo.multiple, uno para el resto */}
-                    {tipo.multiple ? (
-                      archivosMultiples.length > 0 && (
-                        <div style={{ marginTop: '6px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          {archivosMultiples.map((a, i) => (
-                            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '11px', color: '#888' }}>
-                              <span>📄 {a.nombre}</span>
-                              <button onClick={() => handleVerDocumento(a.path)} style={{ background: 'none', border: 'none', color: '#C0203A', textDecoration: 'underline', cursor: 'pointer', fontSize: '11px', padding: 0 }}>Ver</button>
-                              {puedeSubirEste && (
-                                <button onClick={() => handleQuitarArchivoComprobante(movSel.id, tipo.id, i)} style={{ background: 'none', border: 'none', color: '#e53935', cursor: 'pointer', fontSize: '11px', padding: 0 }}>✕ Quitar</button>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )
-                    ) : (
-                      doc?.nombre_archivo && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>📄 {doc.nombre_archivo}</div>
-                    )}
-
-                    {doc?.no_aplica && <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Marcado como "No aplica"</div>}
-                    {estado && (
-                      <span style={{ display: 'inline-block', marginTop: '6px', fontSize: '11px', padding: '2px 10px', borderRadius: '20px', background: ESTADO_COLOR[estado].bg, color: ESTADO_COLOR[estado].color, fontWeight: '500' }}>
-                        {ESTADO_COLOR[estado].label}
-                      </span>
-                    )}
-                    <RegistroValidacion doc={doc} />
-                    {doc?.estado_revision === 'rechazado' && doc.motivo_rechazo && (
-                      <div style={{ fontSize: '12px', color: '#A32D2D', marginTop: '6px', background: '#FCEBEB', padding: '8px 10px', borderRadius: '6px' }}>
-                        ✗ {doc.motivo_rechazo}
-                      </div>
-                    )}
+          {/* FIX: referencias personales — solo texto (nombre + teléfono),
+              no es un documento que se sube. Solo aplica al Titular, en
+              Infonavit/Cofinavit según el checklist oficial. */}
+          {cfgFinanciado?.referenciasPersonales && (
+            <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
+              <div style={{ fontSize: '13px', fontWeight: '600', color: '#1a1a2e', marginBottom: '10px' }}>Dos Referencias Personales</div>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '10px' }}>
+                {[1, 2].map(n => (
+                  <div key={n} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <input placeholder={`Nombre — referencia ${n}`} disabled={!esMio || archivado}
+                      value={formReferencias[`referencia${n}_nombre`]}
+                      onChange={e => setFormReferencias(f => ({ ...f, [`referencia${n}_nombre`]: e.target.value }))}
+                      style={{ padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
+                    <input placeholder={`Teléfono — referencia ${n}`} disabled={!esMio || archivado}
+                      value={formReferencias[`referencia${n}_telefono`]}
+                      onChange={e => setFormReferencias(f => ({ ...f, [`referencia${n}_telefono`]: e.target.value }))}
+                      style={{ padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
                   </div>
-                  <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {!tipo.multiple && doc?.archivo_path && (
-                      <button onClick={() => handleVerDocumento(doc.archivo_path)}
-                        style={{ padding: '6px 12px', background: '#f5f5f5', color: '#333', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                        👁 Ver
-                      </button>
-                    )}
-                    {puedeSubirEste && (!tipo.multiple || archivosMultiples.length < (tipo.maxArchivos || 10)) && (
-                      <label style={{ padding: '6px 12px', background: '#C0203A', color: '#fff', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                        {subiendoTipo === tipo.id ? 'Subiendo...' : tipo.multiple ? '+ Agregar archivo' : doc?.archivo_path ? 'Reemplazar' : 'Subir archivo'}
-                        <input type='file' accept={aceptar} style={{ display: 'none' }}
-                          onChange={e => handleSubirDocumento(movSel.id, tipo.id, e.target.files[0])} />
-                      </label>
-                    )}
-                    {puedeSubirEste && tipo.opcional && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#888', cursor: 'pointer' }}>
-                        <input type='checkbox' checked={!!doc?.no_aplica} onChange={e => handleToggleNoAplica(movSel.id, tipo.id, e.target.checked)} />
-                        No aplica
-                      </label>
-                    )}
-                    {puedoRevisar && tieneArchivo && (
-                      <>
-                        {(!aplicaBuyerPersona(movSel) || buyerPersonaCompleto) && (
-                          <button onClick={() => handleAprobar(movSel.id, tipo.id)} disabled={revisando === tipo.id}
-                            style={{ padding: '6px 12px', background: '#EAF3DE', color: '#27500A', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                            ✓ Aprobar
-                          </button>
-                        )}
-                        <button onClick={() => handleRechazar(movSel.id, tipo.id)} disabled={revisando === tipo.id}
-                          style={{ padding: '6px 12px', background: '#FCEBEB', color: '#A32D2D', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
-                          ✗ Rechazar
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
+                ))}
               </div>
-            );
-          })}
+              {esMio && !archivado && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                  <button onClick={handleGuardarReferencias} disabled={guardandoExtra}
+                    style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
+                    {guardandoExtra ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* FIX: coacreditado — solo aplica a compras financiadas. El
+              vendedor marca si hay coacreditado y su nombre; al activarlo
+              aparece una segunda columna de documentos (mismo checklist,
+              menos los que son exclusivos del Titular). */}
+          {esFinanciado && (
+            <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
+                <input type='checkbox' disabled={!esMio || archivado} checked={formCoacreditado.tiene_coacreditado}
+                  onChange={e => setFormCoacreditado(f => ({ ...f, tiene_coacreditado: e.target.checked }))} />
+                ¿Hay coacreditado?
+              </label>
+              {formCoacreditado.tiene_coacreditado && (
+                <input placeholder='Nombre del coacreditado' disabled={!esMio || archivado}
+                  value={formCoacreditado.coacreditado_nombre}
+                  onChange={e => setFormCoacreditado(f => ({ ...f, coacreditado_nombre: e.target.value }))}
+                  style={{ width: '100%', padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', marginTop: '10px', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
+              )}
+              {esMio && !archivado && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                  <button onClick={handleGuardarCoacreditado} disabled={guardandoExtra}
+                    style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
+                    {guardandoExtra ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
+                </div>
+              )}
+            </div>
+          )}
+
+          {docsCoacreditado.length > 0 && (
+            <>
+              <div style={{ fontSize: '12px', fontWeight: '700', color: '#666', textTransform: 'uppercase', marginTop: '10px' }}>
+                Documentación del Coacreditado{movSel.coacreditado_nombre ? ` — ${movSel.coacreditado_nombre}` : ''}
+              </div>
+              {docsCoacreditado.map(renderDocCard)}
+            </>
+          )}
 
           {/* FIX: Buyer Persona — solo aparece si el apartado cae después de
               la fecha de corte. Se edita en memoria (formBP) y solo se
@@ -995,8 +1205,8 @@ export default function Expedientes({ miRol, miAgente }) {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {listaActual.map(m => {
-            const aprobados = contarAprobados(m.id);
-            const total = TODOS_LOS_DOCS.length;
+            const aprobados = contarAprobados(m);
+            const total = docsRequeridosCompletos(m).length;
             const archivado = expedienteArchivado(m.id);
             const pendiente = necesitaArchivar(m);
             const soyElVendedor = esVendedorDe(m);
