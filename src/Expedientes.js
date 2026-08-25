@@ -355,14 +355,29 @@ export default function Expedientes({ miRol, miAgente }) {
     setTimeout(() => setMsgBP(''), 3000);
   };
 
-  // FIX: guarda tiene_coacreditado/coacreditado_nombre en el movimiento —
-  // determina si se muestra la segunda columna de documentos.
+  // FIX: el checkbox "¿Hay coacreditado?" guarda al instante (como "No
+  // aplica" en el resto del checklist) — al marcarlo, la segunda columna
+  // de documentos debe aparecer de inmediato, sin un paso extra de
+  // "Guardar" en medio.
+  const handleToggleCoacreditado = async (valor) => {
+    if (!movSel) return;
+    const { data, error } = await supabase.from('movimientos').update({
+      tiene_coacreditado: valor,
+      coacreditado_nombre: valor ? movSel.coacreditado_nombre : null,
+    }).eq('id', movSel.id).select().single();
+    if (error) { alert('No se pudo guardar: ' + error.message); return; }
+    setMovSel(data);
+    setMovimientos(prev => prev.map(m => m.id === data.id ? data : m));
+    setFormCoacreditado(f => ({ ...f, tiene_coacreditado: valor, coacreditado_nombre: data.coacreditado_nombre || '' }));
+  };
+
+  // FIX: el nombre del coacreditado sí se edita en memoria y se guarda
+  // aparte (con botón), para no mandar un update por cada letra tecleada.
   const handleGuardarCoacreditado = async () => {
     if (!movSel) return;
     setGuardandoExtra(true); setMsgExtra('');
     const { data, error } = await supabase.from('movimientos').update({
-      tiene_coacreditado: formCoacreditado.tiene_coacreditado,
-      coacreditado_nombre: formCoacreditado.tiene_coacreditado ? (formCoacreditado.coacreditado_nombre || null) : null,
+      coacreditado_nombre: formCoacreditado.coacreditado_nombre || null,
     }).eq('id', movSel.id).select().single();
     setGuardandoExtra(false);
     if (error) { setMsgExtra('❌ Error al guardar: ' + error.message); return; }
@@ -916,24 +931,26 @@ export default function Expedientes({ miRol, miAgente }) {
           {esFinanciado && (
             <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '14px 16px' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontWeight: '600', color: '#1a1a2e', cursor: (esMio && !archivado) ? 'pointer' : 'default' }}>
-                <input type='checkbox' disabled={!esMio || archivado} checked={formCoacreditado.tiene_coacreditado}
-                  onChange={e => setFormCoacreditado(f => ({ ...f, tiene_coacreditado: e.target.checked }))} />
+                <input type='checkbox' disabled={!esMio || archivado} checked={!!movSel.tiene_coacreditado}
+                  onChange={e => handleToggleCoacreditado(e.target.checked)} />
                 ¿Hay coacreditado?
               </label>
-              {formCoacreditado.tiene_coacreditado && (
-                <input placeholder='Nombre del coacreditado' disabled={!esMio || archivado}
-                  value={formCoacreditado.coacreditado_nombre}
-                  onChange={e => setFormCoacreditado(f => ({ ...f, coacreditado_nombre: e.target.value }))}
-                  style={{ width: '100%', padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', marginTop: '10px', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
-              )}
-              {esMio && !archivado && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
-                  <button onClick={handleGuardarCoacreditado} disabled={guardandoExtra}
-                    style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
-                    {guardandoExtra ? 'Guardando...' : 'Guardar'}
-                  </button>
-                  {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
-                </div>
+              {movSel.tiene_coacreditado && (
+                <>
+                  <input placeholder='Nombre del coacreditado' disabled={!esMio || archivado}
+                    value={formCoacreditado.coacreditado_nombre}
+                    onChange={e => setFormCoacreditado(f => ({ ...f, coacreditado_nombre: e.target.value }))}
+                    style={{ width: '100%', padding: '8px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '13px', boxSizing: 'border-box', marginTop: '10px', background: (!esMio || archivado) ? '#f9f9f9' : '#fff' }} />
+                  {esMio && !archivado && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '10px' }}>
+                      <button onClick={handleGuardarCoacreditado} disabled={guardandoExtra}
+                        style={{ padding: '8px 18px', background: guardandoExtra ? '#ccc' : '#C0203A', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '13px', cursor: guardandoExtra ? 'default' : 'pointer' }}>
+                        {guardandoExtra ? 'Guardando...' : 'Guardar nombre'}
+                      </button>
+                      {msgExtra && <span style={{ fontSize: '12px', color: msgExtra.startsWith('✅') ? '#27500A' : '#A32D2D' }}>{msgExtra}</span>}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
