@@ -6,6 +6,7 @@ const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 // FIX: se agrega "Especial" — misma lista que Movimientos.js, para que el
 // panel de edición del historial pueda mostrar/asignar este plan también.
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const colorTipo = { 'Apartado': '#F59E0B', 'Vendida': '#10B981', 'Cancelación': '#EF4444', 'Cambio de Unidad': '#8B5CF6' };
 const bgTipo = { 'Apartado': '#FFF8E1', 'Vendida': '#EAF3DE', 'Cancelación': '#FCEBEB', 'Cambio de Unidad': '#F3F0FF' };
@@ -198,7 +199,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
   const handleGuardar = async () => {
     setGuardando(true);
     await supabase.from('movimientos').update({
-      tipo: form.tipo, monto: form.monto, plan_pago: form.plan_pago,
+      tipo: form.tipo, monto: form.monto, plan_pago: form.plan_pago, tipo_compra: form.tipo_compra,
       fecha_apartado: form.fecha_apartado, fecha_firma: form.fecha_firma,
       fecha_cancelacion: form.fecha_cancelacion, motivo_cancelacion: form.motivo_cancelacion,
       comisionable: form.comisionable, fecha_movimiento: new Date().toISOString(),
@@ -250,6 +251,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       case 'vendedor': return m.vendedor || '';
       case 'monto': return Number(m.monto || 0);
       case 'plan_pago': return m.plan_pago || '';
+      case 'tipo_compra': return m.tipo_compra || '';
       case 'comisionable': return m.comisionable ? 1 : 0;
       case 'fecha_apartado': { const d = parseFechaLocal(m.fecha_apartado); return d ? d.getTime() : 0; }
       case 'fecha_firma': { const d = parseFechaLocal(m.fecha_firma); return d ? d.getTime() : 0; }
@@ -324,7 +326,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
       const filas = movs.map(m => ({
         'Estatus': m.tipo, 'Torre/Etapa': estructurasPorUnidad[m.unidad_id] || '', 'Unidad': m.unidad_numero, 'Cliente': m.contacto_nombre,
         'Origen': m.origen_cliente, 'Vendedor': m.vendedor, 'Monto': Number(m.monto || 0),
-        'Plan de Pago': m.plan_pago, 'Comisionable': m.comisionable ? 'Sí' : 'No',
+        'Plan de Pago': m.plan_pago, 'Tipo de Compra': m.tipo_compra, 'Comisionable': m.comisionable ? 'Sí' : 'No',
         'F. Apartado': fmtFecha(m.fecha_apartado), 'F. Firma': fmtFecha(m.fecha_firma),
         'F. Cancelación': m.tipo === 'Cancelación' ? fmtFecha(m.fecha_cancelacion) : '',
         'Motivo Cancelación': m.motivo_cancelacion || '',
@@ -361,6 +363,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
     { key: 'vendedor', label: 'Vendedor' },
     { key: 'monto', label: 'Monto' },
     { key: 'plan_pago', label: 'Plan de Pago' },
+    { key: 'tipo_compra', label: 'Tipo de Compra' },
     { key: 'comisionable', label: 'Comisionable' },
     { key: 'fecha_apartado', label: 'F. Apartado' },
     { key: 'fecha_firma', label: 'F. Firma' },
@@ -429,6 +432,12 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           </div>
         </div>
         <div style={{ marginBottom: '12px' }}>
+          <label style={labelStyle}>Tipo de Compra</label>
+          <select value={form.tipo_compra || ''} onChange={e => setForm({ ...form, tipo_compra: e.target.value })} style={inputStyle}>
+            {TIPO_COMPRA_OPCIONES.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: '12px' }}>
           <label style={labelStyle}>Fecha de Apartado</label>
           <input type='date' value={form.fecha_apartado || ''} onChange={e => setForm({ ...form, fecha_apartado: e.target.value })} style={inputStyle} />
         </div>
@@ -488,6 +497,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
           ['Vendedor', m.vendedor],
           ['Origen', m.origen_cliente],
           ['Plan de Pago', m.plan_pago],
+          ['Tipo de Compra', m.tipo_compra],
           ['Comisionable', m.comisionable ? 'Sí' : 'No'],
           ['F. Apartado', fmtFecha(m.fecha_apartado)],
           ['F. Firma', fmtFecha(m.fecha_firma)],
@@ -755,6 +765,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
                   <td style={{ padding: '10px 12px' }}>
                     {m.plan_pago ? <span style={{ fontSize: '11px', color: '#3B82F6', fontWeight: '500' }}>{m.plan_pago}</span> : '—'}
                   </td>
+                  <td style={{ padding: '10px 12px', color: '#555' }}>{m.tipo_compra || '—'}</td>
                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                     <span style={{ fontSize: '12px', color: m.comisionable ? '#27500A' : '#888' }}>{m.comisionable ? 'Sí' : 'No'}</span>
                   </td>

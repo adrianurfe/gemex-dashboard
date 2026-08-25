@@ -6,6 +6,7 @@ const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 // políticas de los demás planes (caso a caso).
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
 const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario', 'Showroom'];
+const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
 // FIX: Gerente Externo entra a la misma ventana martes-lunes que los demás Gerentes
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Gerente Externo'];
 
@@ -46,7 +47,7 @@ export default function Movimientos() {
   const [form, setForm] = useState({
     desarrollo_id: '', desarrollo_nombre: '',
     unidad_id: '', unidad_numero: '',
-    monto: 0, plan_pago: 'Contado',
+    monto: 0, plan_pago: 'Contado', tipo_compra: 'Contado',
     fecha_apartado: '', fecha_firma: '',
     fecha_cancelacion: '', motivo_cancelacion: '',
     comisionable: false, origen_cliente: 'Referido',
@@ -200,6 +201,7 @@ export default function Movimientos() {
       unidad_inicial: tipo === 'Cambio de Unidad' ? form.unidad_numero : null,
       monto: tipo === 'Cambio de Unidad' ? form.nuevo_monto : form.monto,
       plan_pago: tipo === 'Cambio de Unidad' ? form.nuevo_plan_pago : form.plan_pago,
+      tipo_compra: form.tipo_compra,
       fecha_apartado: form.fecha_apartado || null, fecha_firma: form.fecha_firma || null,
       fecha_cancelacion: form.fecha_cancelacion || null, motivo_cancelacion: form.motivo_cancelacion || null,
       comisionable: form.comisionable, origen_cliente: form.origen_cliente,
@@ -216,7 +218,7 @@ export default function Movimientos() {
       setContactoSel(null); setBuscarContacto(''); setEstructuraSel('');
       setForm({
         desarrollo_id: '', desarrollo_nombre: '', unidad_id: '', unidad_numero: '',
-        monto: 0, plan_pago: 'Contado', fecha_apartado: '', fecha_firma: '',
+        monto: 0, plan_pago: 'Contado', tipo_compra: 'Contado', fecha_apartado: '', fecha_firma: '',
         fecha_cancelacion: '', motivo_cancelacion: '', comisionable: false,
         origen_cliente: 'Referido', unidad_inicial: '', nueva_unidad_id: '',
         nueva_unidad_numero: '', nuevo_plan_pago: 'Contado', nuevo_monto: 0
@@ -368,6 +370,14 @@ export default function Movimientos() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
             {PLANES_PAGO.map(p => btnPlan(p, p))}
           </div>
+        </div>
+
+        {/* Tipo de compra */}
+        <div style={{ marginBottom: '16px' }}>
+          <label style={labelStyle}>Tipo de Compra</label>
+          <select value={form.tipo_compra} onChange={e => setForm({ ...form, tipo_compra: e.target.value })} style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }}>
+            {TIPO_COMPRA_OPCIONES.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
         </div>
 
         {/* Fechas */}
