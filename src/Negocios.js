@@ -5,8 +5,10 @@ const ETAPAS = [
   { id: 'Cotización', color: '#F59E0B' },
   { id: 'Cita', color: '#3B82F6' },
   { id: 'Seguimiento', color: '#8B5CF6' },
-  { id: 'Expediente', color: '#EC4899' },
-  { id: 'Cierre ganado', color: '#10B981' },
+  { id: 'Apartado', color: '#EC4899' },
+  { id: 'Venta', color: '#10B981' },
+  { id: 'Escritura', color: '#6366F1' },
+  { id: 'Cobranza', color: '#14B8A6' },
   { id: 'Cierre perdido', color: '#EF4444' },
 ];
 
