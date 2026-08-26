@@ -148,6 +148,8 @@ export default function Expedientes({ miRol, miAgente }) {
   const [docsPorMovimiento, setDocsPorMovimiento] = useState({});
   const [loading, setLoading] = useState(true);
   const [buscar, setBuscar] = useState('');
+  const [desarrollos, setDesarrollos] = useState([]);
+  const [filtroDesarrollo, setFiltroDesarrollo] = useState('');
   const [movSel, setMovSel] = useState(null);
   const [subiendoTipo, setSubiendoTipo] = useState(null);
   const [generandoZip, setGenerandoZip] = useState(null);
@@ -217,6 +219,7 @@ export default function Expedientes({ miRol, miAgente }) {
     cargarAgentesPorCorreo();
     cargarOcupaciones();
     cargarCutoffBuyerPersona();
+    cargarDesarrollos();
     if (esAdmin) { cargarResponsables(); cargarSuperAdmins(); }
   }, [miRol, miAgente]);
 
@@ -263,6 +266,19 @@ export default function Expedientes({ miRol, miAgente }) {
       setDocsPorMovimiento(mapa);
     }
     setLoading(false);
+  };
+
+  // FIX: lista de desarrollos para el filtro — Gerente Editor/Operador y
+  // Gerente Externo solo ven los suyos (desarrollos_cargo), igual que ya
+  // limita el resto de la pantalla; Admin/Super Admin/Agente ven todos.
+  const cargarDesarrollos = async () => {
+    let query = supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
+    if (esGerente || esGerenteExterno) {
+      if (misProyectos.length === 0) { setDesarrollos([]); return; }
+      query = query.in('nombre', misProyectos);
+    }
+    const { data } = await query;
+    setDesarrollos(data || []);
   };
 
   const cargarAgentesPorCorreo = async () => {
@@ -707,9 +723,10 @@ export default function Expedientes({ miRol, miAgente }) {
   });
 
   const listaActual = (tab === 'cargar' ? movimientosCargar : movimientosDescarga).filter(m =>
-    !buscar || m.contacto_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
-    m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
-    m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())
+    (!buscar || m.contacto_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
+      m.desarrollo_nombre?.toLowerCase().includes(buscar.toLowerCase()) ||
+      m.unidad_numero?.toLowerCase().includes(buscar.toLowerCase())) &&
+    (!filtroDesarrollo || m.desarrollo_nombre === filtroDesarrollo)
   );
 
   const rechazados = misDocumentosRechazados();
@@ -1212,8 +1229,15 @@ export default function Expedientes({ miRol, miAgente }) {
         </div>
       )}
 
-      <input placeholder='Buscar por cliente, desarrollo o unidad...' value={buscar} onChange={e => setBuscar(e.target.value)}
-        style={{ width: isMobile ? '100%' : '280px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box', marginBottom: '1rem' }} />
+      <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '1rem' }}>
+        <input placeholder='Buscar por cliente, desarrollo o unidad...' value={buscar} onChange={e => setBuscar(e.target.value)}
+          style={{ width: isMobile ? '100%' : '280px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+        <select value={filtroDesarrollo} onChange={e => setFiltroDesarrollo(e.target.value)}
+          style={{ width: isMobile ? '100%' : '220px', padding: '10px 12px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', boxSizing: 'border-box' }}>
+          <option value=''>Todos los desarrollos</option>
+          {desarrollos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
+        </select>
+      </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', color: '#888', padding: '2rem' }}>Cargando...</div>
