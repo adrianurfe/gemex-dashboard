@@ -10,7 +10,7 @@ const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', '
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const colorTipo = { 'Apartado': '#F59E0B', 'Vendida': '#10B981', 'Cancelación': '#EF4444', 'Cambio de Unidad': '#8B5CF6' };
 const bgTipo = { 'Apartado': '#FFF8E1', 'Vendida': '#EAF3DE', 'Cancelación': '#FCEBEB', 'Cambio de Unidad': '#F3F0FF' };
-const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Gerente Externo'];
+const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 const DIAS_SEMANA_LABEL = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 
 function parseFechaLocal(fechaStr) {
@@ -109,7 +109,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
 
   // FIX: los Gerentes solo ven movimientos de sus desarrollos a cargo,
   // igual que ya hacemos en Negocios y el Dashboard de Dirección.
-  // FIX: Gerente Externo va MÁS ALLÁ — además del desarrollo, se limita
+  // FIX: Mesa de Control va MÁS ALLÁ — además del desarrollo, se limita
   // a movimientos de SU GENTE (él + agentes_cargo). Se cruza primero por
   // vendedor_correo (confiable, columna nueva) y como respaldo también
   // por nombre (para movimientos viejos cargados antes de que existiera
@@ -119,7 +119,7 @@ export default function HistorialMovimientos({ miRol, miAgente }) {
     let query = supabase.from('movimientos').select('*').order('created_at', { ascending: false });
     if (filtroTipo) query = query.eq('tipo', filtroTipo);
     if (filtroDesarrollo) query = query.eq('desarrollo_nombre', filtroDesarrollo);
-    if (miRol === 'Gerente Externo') {
+    if (miRol === 'Mesa de Control') {
       const cargo = miAgente?.desarrollos_cargo || [];
       const correo = miAgente?.correo || '';
       const equipoCorreos = [correo, ...(miAgente?.agentes_cargo || [])].filter(Boolean);

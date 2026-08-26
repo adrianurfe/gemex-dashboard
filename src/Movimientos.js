@@ -7,8 +7,8 @@ const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
 const ORIGEN_OPCIONES = ['Referido', 'Autogeneración', 'Campañas digitales', 'Mensaje WhatsApp', 'Portal inmobiliario', 'Showroom'];
 const TIPO_COMPRA_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
-// FIX: Gerente Externo entra a la misma ventana martes-lunes que los demás Gerentes
-const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Gerente Externo'];
+// FIX: Mesa de Control entra a la misma ventana martes-lunes que los demás Gerentes
+const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);

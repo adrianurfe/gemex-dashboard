@@ -193,7 +193,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
 
   const puedeEditar = (desarrollo) => {
     if (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin') return true;
-    if (miRol === 'Gerente Editor' || miRol === 'Gerente Externo') return (miAgente?.desarrollos_cargo || []).includes(desarrollo.nombre);
+    if (miRol === 'Gerente Editor' || miRol === 'Mesa de Control') return (miAgente?.desarrollos_cargo || []).includes(desarrollo.nombre);
     return false;
   };
 
@@ -588,7 +588,7 @@ export default function Desarrollos({ miRol: miRolProp, miAgente: miAgenteProp }
                     </button>
                     {showMenu === d.id && (
                       <div style={{ position: 'absolute', right: 0, top: '32px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)', zIndex: 100, minWidth: '170px' }}>
-                        {(miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Externo') && (
+                        {(miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Sub Admin' || miRol === 'Gerente Editor' || miRol === 'Mesa de Control') && (
                           <button onClick={() => { setVistaPlanes(d); setShowMenu(null); }}
                             style={{ display: 'block', width: '100%', padding: '12px 16px', background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', textAlign: 'left', color: '#333' }}>
                             💳 Planes

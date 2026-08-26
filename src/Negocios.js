@@ -14,10 +14,10 @@ const TIEMPO_COMPRA_OPCIONES = ['Inmediato', '1 a 3 meses', '3 a 6 meses', '6 a 
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const ROLES_VER_TODOS = ['Super Admin', 'Admin', 'Sub Admin'];
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
-// FIX: Gerente Externo también debe limitarse a sus propios desarrollos
+// FIX: Mesa de Control también debe limitarse a sus propios desarrollos
 // asignados para el selector/dropdown — pero a diferencia de Editor/
 // Operador, además se restringe a "su gente" (ver cargarNegocios).
-const ROLES_GERENTE_TODOS = [...ROLES_GERENTE, 'Gerente Externo'];
+const ROLES_GERENTE_TODOS = [...ROLES_GERENTE, 'Mesa de Control'];
 const ROLES_ASIGNAR = ['Super Admin'];
 
 function useIsMobile() {
@@ -122,8 +122,8 @@ export default function Negocios() {
 
     if (ROLES_VER_TODOS.includes(miRol)) {
       // ve todo, sin restricción
-    } else if (miRol === 'Gerente Externo') {
-      // FIX: Gerente Externo (trabaja para el desarrollador) solo ve
+    } else if (miRol === 'Mesa de Control') {
+      // FIX: Mesa de Control (trabaja para el desarrollador) solo ve
       // negocios de SU GENTE (él + los agentes que tiene a cargo), y
       // solo dentro de sus desarrollos asignados — a diferencia de
       // Gerente Editor/Operador, que ven TODOS los negocios del

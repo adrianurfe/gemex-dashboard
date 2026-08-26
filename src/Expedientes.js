@@ -183,12 +183,6 @@ export default function Expedientes({ miRol, miAgente }) {
   const [formReferencias, setFormReferencias] = useState({ referencia1_nombre: '', referencia1_telefono: '', referencia2_nombre: '', referencia2_telefono: '' });
   const [guardandoExtra, setGuardandoExtra] = useState(false);
   const [msgExtra, setMsgExtra] = useState('');
-  // FIX: Gerente Externo solo debe ver/subir expedientes de SU EQUIPO
-  // (él + agentes_cargo), no de todo el proyecto como los demás Gerentes.
-  // Se resuelven correos + nombres del equipo para cruzar contra
-  // movimiento.vendedor / vendedor_correo.
-  const [equipoExternoCorreos, setEquipoExternoCorreos] = useState([]);
-  const [equipoExternoNombres, setEquipoExternoNombres] = useState([]);
   // FIX: mapa correo -> nombre completo, para mostrar quién aprobó/rechazó
   // cada documento (registro de validación, por temas de manipulación de
   // información).
@@ -196,10 +190,10 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const nombreCompleto = miAgente ? `${miAgente.nombre} ${miAgente.apellidos}`.trim() : '';
   const esGerente = ROLES_GERENTE.includes(miRol);
-  // FIX: Gerente Externo NO entra en ROLES_GERENTE — a propósito, porque
-  // su alcance es distinto (solo su equipo, no todo el proyecto, y sin
-  // pestaña "Descargar").
-  const esGerenteExterno = miRol === 'Gerente Externo';
+  // FIX: Mesa de Control es quien revisa expedientes — a diferencia de los
+  // demás Gerentes, ve y revisa TODOS los expedientes de la empresa, sin
+  // restricción de desarrollo o equipo (confirmado con el cliente).
+  const esMesaControl = miRol === 'Mesa de Control';
   const esAdmin = ROLES_ADMIN.includes(miRol);
   const soyResponsable = miAgente?.correo && responsables.includes(miAgente.correo);
   // FIX: aviso a los responsables de expedientes con documentos por
@@ -210,9 +204,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const yaAvisoPendientesRef = useRef(false);
   const misProyectos = miAgente?.desarrollos_cargo || [];
 
-  // FIX: puedeVerDescarga deja fuera a Gerente Externo a propósito — solo
-  // tiene la pestaña "Cargar".
-  const puedeVerDescarga = esAdmin || esGerente;
+  const puedeVerDescarga = esAdmin || esGerente || esMesaControl;
 
   useEffect(() => {
     cargarMovimientos();
@@ -234,21 +226,6 @@ export default function Expedientes({ miRol, miAgente }) {
     setMsgExtra('');
   }, [movSel?.id]);
 
-  useEffect(() => {
-    const cargarEquipoExterno = async () => {
-      if (!esGerenteExterno || !miAgente?.correo) { setEquipoExternoCorreos([]); setEquipoExternoNombres([]); return; }
-      const correos = [miAgente.correo, ...(miAgente.agentes_cargo || [])];
-      setEquipoExternoCorreos(correos);
-      const { data } = await supabase.from('agentes').select('nombre, apellidos, correo').in('correo', correos);
-      setEquipoExternoNombres((data || []).map(a => `${a.nombre || ''} ${a.apellidos || ''}`.trim()).filter(Boolean));
-    };
-    cargarEquipoExterno();
-  }, [miRol, miAgente]);
-
-  // FIX: ¿este movimiento es de alguien en el equipo de un Gerente
-  // Externo? (él mismo o uno de sus agentes_cargo)
-  const esDeMiEquipoExterno = (m) => equipoExternoCorreos.includes(m.vendedor_correo) || equipoExternoNombres.includes(m.vendedor);
-
   const cargarMovimientos = async () => {
     setLoading(true);
     // FIX: se liga al movimiento tipo "Apartado" — es donde vive el
@@ -268,12 +245,12 @@ export default function Expedientes({ miRol, miAgente }) {
     setLoading(false);
   };
 
-  // FIX: lista de desarrollos para el filtro — Gerente Editor/Operador y
-  // Gerente Externo solo ven los suyos (desarrollos_cargo), igual que ya
-  // limita el resto de la pantalla; Admin/Super Admin/Agente ven todos.
+  // FIX: lista de desarrollos para el filtro — Gerente Editor/Operador
+  // solo ven los suyos (desarrollos_cargo), igual que ya limita el resto
+  // de la pantalla; Admin/Super Admin/Agente/Mesa de Control ven todos.
   const cargarDesarrollos = async () => {
     let query = supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
-    if (esGerente || esGerenteExterno) {
+    if (esGerente) {
       if (misProyectos.length === 0) { setDesarrollos([]); return; }
       query = query.in('nombre', misProyectos);
     }
@@ -518,7 +495,7 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const notificarAdminsDocumentoPendiente = async (movimientoId) => {
     const mov = movimientos.find(m => m.id === movimientoId);
-    const { data: admins } = await supabase.from('agentes').select('correo').in('rol', ['Super Admin', 'Admin']).eq('activo', true);
+    const { data: admins } = await supabase.from('agentes').select('correo').in('rol', ['Super Admin', 'Admin', 'Mesa de Control']).eq('activo', true);
     const correos = (admins || []).map(a => a.correo).filter(Boolean);
     const badgeCount = await contarPendientesGlobal();
     enviarPush({
@@ -710,7 +687,7 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const movimientosCargar = movimientos.filter(m => {
     if (esVendedorDe(m)) return true;
-    if (esGerenteExterno) return esDeMiEquipoExterno(m) && esDeMiProyecto(m);
+    if (esMesaControl) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
     if (esAdmin) return true;
     return false;
@@ -718,6 +695,7 @@ export default function Expedientes({ miRol, miAgente }) {
 
   const movimientosDescarga = movimientos.filter(m => {
     if (esAdmin) return true;
+    if (esMesaControl) return true;
     if (esGerente && esDeMiProyecto(m)) return true;
     return false;
   });
@@ -739,11 +717,11 @@ export default function Expedientes({ miRol, miAgente }) {
   );
 
   useEffect(() => {
-    if (esAdmin && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
+    if ((esAdmin || esMesaControl) && !yaAvisoPendientesRef.current && expedientesPorRevisar.length > 0) {
       yaAvisoPendientesRef.current = true;
       setShowAlertaPendientes(true);
     }
-  }, [esAdmin, expedientesPorRevisar.length]);
+  }, [esAdmin, esMesaControl, expedientesPorRevisar.length]);
 
   // FIX: bloque reutilizable que muestra quién aprobó/rechazó el
   // documento y cuándo — registro visible SOLO para Super Admin (no
@@ -766,10 +744,10 @@ export default function Expedientes({ miRol, miAgente }) {
     const archivado = expedienteArchivado(movSel.id);
     const esMio = esVendedorDe(movSel);
     const soloLectura11 = tab === 'cargar' && !esMio; // Gerente/Admin viendo lo de otros: solo lectura de los 11
-    const puedoSubirOrden = esGerenteExterno
-      ? (esDeMiEquipoExterno(movSel) && esDeMiProyecto(movSel))
-      : (esGerente && esDeMiProyecto(movSel));
-    const puedoRevisar = tab === 'descargar' && esAdmin;
+    const puedoSubirOrden = esGerente && esDeMiProyecto(movSel);
+    // FIX: Mesa de Control también puede aprobar/rechazar — es quien
+    // revisa expedientes ahora, no solo Admin/Super Admin.
+    const puedoRevisar = tab === 'descargar' && (esAdmin || esMesaControl);
     const cfgFinanciado = DOCS_FINANCIADO_ESPECIFICOS[movSel.tipo_compra];
     const esFinanciado = !!cfgFinanciado;
     const docsTitular = docsRequeridos(movSel, 'titular');
@@ -876,7 +854,7 @@ export default function Expedientes({ miRol, miAgente }) {
             <div style={{ fontSize: '13px', color: '#888' }}>{movSel.desarrollo_nombre} — Unidad {movSel.unidad_numero} — Vendedor: {movSel.vendedor}</div>
           </div>
           <div style={{ display: 'flex', gap: '8px' }}>
-            {(esAdmin || (esGerente && esDeMiProyecto(movSel))) && (
+            {(esAdmin || esMesaControl || (esGerente && esDeMiProyecto(movSel))) && (
               <button onClick={() => handleDescargarZip(movSel)} disabled={generandoZip === movSel.id}
                 style={{ padding: '8px 16px', background: '#C0203A', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                 {generandoZip === movSel.id ? 'Generando ZIP...' : '⬇ Descargar todo (ZIP)'}
@@ -1174,7 +1152,7 @@ export default function Expedientes({ miRol, miAgente }) {
       {/* FIX: banner permanente (se ve cada vez que estás en "Descargar")
           + modal que solo aparece una vez por sesión, avisando que hay
           documentos subidos esperando revisión. */}
-      {tab === 'descargar' && esAdmin && expedientesPorRevisar.length > 0 && (
+      {tab === 'descargar' && (esAdmin || esMesaControl) && expedientesPorRevisar.length > 0 && (
         <div style={{ padding: '12px 16px', background: '#EAF3DE', color: '#27500A', borderRadius: '8px', fontSize: '13px', marginBottom: '1.25rem' }}>
           📋 Tienes {expedientesPorRevisar.length} expediente{expedientesPorRevisar.length !== 1 ? 's' : ''} con documentos por revisar.
         </div>

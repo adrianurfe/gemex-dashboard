@@ -123,12 +123,12 @@ export default function Inventario({ desarrollo, onBack }) {
     }
   };
 
-  // FIX: Gerente Externo es responsable de precios/estatus/planes SOLO en
+  // FIX: Mesa de Control es responsable de precios/estatus/planes SOLO en
   // los desarrollos que tiene asignados a su cargo — a diferencia de
   // Super Admin/Admin que pueden en cualquier desarrollo.
-  const esGerenteExternoDeEsteDesarrollo = miRol === 'Gerente Externo' && misDesarrollosCargo.includes(desarrollo.nombre);
-  const puedeGestionarEstatus = miRol === 'Super Admin' || miRol === 'Admin' || esGerenteExternoDeEsteDesarrollo;
-  const puedeCambiarPrecio = miRol === 'Super Admin' || miRol === 'Admin' || esGerenteExternoDeEsteDesarrollo;
+  const esMesaControlDeEsteDesarrollo = miRol === 'Mesa de Control' && misDesarrollosCargo.includes(desarrollo.nombre);
+  const puedeGestionarEstatus = miRol === 'Super Admin' || miRol === 'Admin' || esMesaControlDeEsteDesarrollo;
+  const puedeCambiarPrecio = miRol === 'Super Admin' || miRol === 'Admin' || esMesaControlDeEsteDesarrollo;
   const puedeVerPrecioOculto = miRol === 'Super Admin';
   // FIX BUG DE SEGURIDAD: antes los botones "+ Cargar unidad", "Editar" y
   // "Eliminar" (menú "···" en escritorio y panel de detalle en móvil) no

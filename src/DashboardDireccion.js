@@ -5,10 +5,10 @@ import jsPDF from 'jspdf';
 const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 const COLORES_PLAN = ['#3B82F6', '#F59E0B', '#10B981', '#8B5CF6'];
 const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-// FIX: Gerente Externo entra a la misma lógica de "solo mis desarrollos"
+// FIX: Mesa de Control entra a la misma lógica de "solo mis desarrollos"
 // que Gerente Editor/Operador — pero además, más abajo, se filtra
 // también por vendedor (él + su gente), no todo el desarrollo.
-const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Gerente Externo'];
+const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador', 'Mesa de Control'];
 
 function parseFechaLocal(fechaStr) {
   if (!fechaStr) return null;
@@ -44,7 +44,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   // externos (inmobiliarias y asesores independientes)
   const [filtroEquipoVendedor, setFiltroEquipoVendedor] = useState('');
   const [agentesEquipoMap, setAgentesEquipoMap] = useState({});
-  // FIX: correos del equipo de un Gerente Externo (él + agentes_cargo),
+  // FIX: correos del equipo de un Mesa de Control (él + agentes_cargo),
   // resueltos junto con sus nombres — se usa para filtrar movsFiltrados
   // a "solo lo que él y su gente generan".
   const [equipoExternoCorreos, setEquipoExternoCorreos] = useState([]);
@@ -67,12 +67,12 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   useEffect(() => { cargarObjetivos(); }, [anioSel]);
   useEffect(() => { procesarGrafica(); }, [movimientos, periodo, desarrolloSel, anioSel]);
 
-  // FIX: resuelve correos + nombres del equipo de un Gerente Externo (él
+  // FIX: resuelve correos + nombres del equipo de un Mesa de Control (él
   // mismo + sus agentes_cargo) — se usa para limitar el dashboard a "lo
   // que él y su gente generan", no todo el desarrollo.
   useEffect(() => {
     const cargarEquipoExterno = async () => {
-      if (miRol !== 'Gerente Externo' || !miAgente?.correo) { setEquipoExternoCorreos([]); setEquipoExternoNombres([]); return; }
+      if (miRol !== 'Mesa de Control' || !miAgente?.correo) { setEquipoExternoCorreos([]); setEquipoExternoNombres([]); return; }
       const correos = [miAgente.correo, ...(miAgente.agentes_cargo || [])];
       setEquipoExternoCorreos(correos);
       const { data } = await supabase.from('agentes').select('nombre, apellidos, correo').in('correo', correos);
@@ -160,7 +160,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   // FIX: cuando no hay un desarrollo específico seleccionado, se limita a
   // los desarrollos permitidos del rol (todos para Admin/Super Admin,
   // solo los suyos para Gerentes) en vez de mostrar la empresa completa.
-  // FIX: para Gerente Externo, además se limita a movimientos de SU
+  // FIX: para Mesa de Control, además se limita a movimientos de SU
   // EQUIPO (él + agentes_cargo) — cruzando por vendedor_correo (confiable)
   // y por nombre como respaldo para movimientos viejos sin ese campo.
   const movsFiltrados = movimientos.filter(m => {
@@ -169,7 +169,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     if (anioMov !== anioSel) return false;
     if (desarrolloSel && m.desarrollo_nombre !== desarrolloSel) return false;
     if (!desarrolloSel && !nombresPermitidos.includes(m.desarrollo_nombre)) return false;
-    if (miRol === 'Gerente Externo') {
+    if (miRol === 'Mesa de Control') {
       const esDeMiEquipo = equipoExternoCorreos.includes(m.vendedor_correo) || equipoExternoNombres.includes(m.vendedor);
       if (!esDeMiEquipo) return false;
     }
@@ -451,7 +451,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
               {desarrolloSel || 'Consolidado General'}
             </h2>
             <div style={{ fontSize: '12px', color: '#888' }}>
-              Dashboard de dirección{miRol === 'Gerente Externo' ? ' — tú y tu equipo' : ''}
+              Dashboard de dirección{miRol === 'Mesa de Control' ? ' — tú y tu equipo' : ''}
             </div>
           </div>
           {isMobile ? (
@@ -475,7 +475,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
                   {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
                 </select>
               )}
-              {miRol !== 'Desarrollador' && miRol !== 'Gerente Externo' && (
+              {miRol !== 'Desarrollador' && miRol !== 'Mesa de Control' && (
                 <select value={filtroEquipoVendedor} onChange={e => setFiltroEquipoVendedor(e.target.value)}
                   style={{ padding: '8px 14px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff', minWidth: '160px' }}>
                   <option value=''>Todos los equipos</option>
@@ -505,7 +505,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
               <option value=''>Todos los proyectos</option>
               {desarrollosPermitidos.map(d => <option key={d.id} value={d.nombre}>{d.nombre}</option>)}
             </select>
-            {miRol !== 'Gerente Externo' && (
+            {miRol !== 'Mesa de Control' && (
               <select value={filtroEquipoVendedor} onChange={e => setFiltroEquipoVendedor(e.target.value)}
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '14px', background: '#fff' }}>
                 <option value=''>Todos los equipos</option>

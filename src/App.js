@@ -42,11 +42,11 @@ const MENU_POR_ROL = {
   'Sub Admin':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'agentes', 'expedientes', 'direccion'],
   'Gerente Editor':   ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
   'Gerente Operador': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
-  // Gerente Externo — trabaja para el desarrollador, no para Gemex. Sin
-  // Ranking Gemex ni Agentes; solo su trabajo (Contactos/Negocios/
-  // Desarrollos/Expedientes/Dirección de su gente). El detalle fino de qué
-  // ve dentro de Dirección se filtra en submenuFiltrado más abajo.
-  'Gerente Externo':  ['contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
+  // Mesa de Control — revisa expedientes de TODA la empresa (sin
+  // restricción de desarrollo/equipo, a diferencia de los demás Gerentes).
+  // Sin Ranking Gemex, Contactos ni Agentes. Dentro de Dirección solo ve
+  // Movimientos e Historial (se filtra en submenuFiltrado más abajo).
+  'Mesa de Control':  ['negocios', 'desarrollos', 'expedientes', 'direccion'],
   'Agente':      ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
   'Desarrollador': ['contactos', 'desarrollos', 'direccion'],
 };
@@ -138,9 +138,13 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             const isActive = active === item.id || submenuActivo;
             const submenuFiltrado = (item.submenu || []).filter(s => {
               if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
-              if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo';
+              // FIX: Mesa de Control solo entra a revisar Movimientos e
+              // Historial — sin Dashboard, Objetivos, Tendencias ni Buyer
+              // Persona (a diferencia de los demás Gerentes).
+              if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial';
+              if (s.id === 'historial') return miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               if (s.id === 'tendencias_producto') return miRol === 'Super Admin';
-              if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo';
+              if (s.id === 'buyer_persona') return miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador';
               return true;
             });
             return (
@@ -700,7 +704,7 @@ function App() {
     switch (activePage) {
       case 'dashboard':
         if (miRol === 'Agente' && miAgente?.equipo !== 'Gemex') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
-        if (miRol === 'Gerente Externo') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
+        if (miRol === 'Mesa de Control') return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         if (miRol !== 'Super Admin' && !rankingBsVisible) return <Desarrollos miRol={miRol} miAgente={miAgente} />;
         return <Dashboard />;
       case 'contactos': return <Contactos />;
@@ -710,11 +714,11 @@ function App() {
       case 'expedientes': return <Expedientes miRol={miRol} miAgente={miAgente} />;
       case 'movimientos': return <Movimientos />;
       case 'dashboard_dir': return <DashboardDireccion miRol={miRol} miAgente={miAgente} />;
-      case 'historial': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo') ? <HistorialMovimientos miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
+      case 'historial': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Mesa de Control') ? <HistorialMovimientos miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'objetivos': return <Objetivos miRol={miRol} miAgente={miAgente} />;
       case 'tendencias_producto': return miRol === 'Super Admin' ? <TendenciasProducto /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
-        return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Gerente Externo')
+        return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador')
           ? <BuyerPersona miRol={miRol} miAgente={miAgente} />
           : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'micuenta': return <MiCuenta user={session.user} miRol={miRol} />;

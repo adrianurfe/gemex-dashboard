@@ -33,8 +33,8 @@ export default function BuyerPersona({ miRol, miAgente }) {
   const [filtroDesarrollo, setFiltroDesarrollo] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const esGerenteExterno = miRol === 'Gerente Externo';
-  const esGerente = ROLES_GERENTE.includes(miRol) || esGerenteExterno;
+  const esMesaControl = miRol === 'Mesa de Control';
+  const esGerente = ROLES_GERENTE.includes(miRol) || esMesaControl;
 
   const desarrollosPermitidos = esGerente
     ? desarrollos.filter(d => (miAgente?.desarrollos_cargo || []).includes(d.nombre))
@@ -65,8 +65,8 @@ export default function BuyerPersona({ miRol, miAgente }) {
     const { data } = await query.limit(10000);
     let filas = data || [];
 
-    // FIX: Gerente Externo se limita además a "su gente" (él + agentes_cargo)
-    if (esGerenteExterno) {
+    // FIX: Mesa de Control se limita además a "su gente" (él + agentes_cargo)
+    if (esMesaControl) {
       const nombreCompleto = miAgente ? `${miAgente.nombre || ''} ${miAgente.apellidos || ''}`.trim() : '';
       const { data: equipoAgentes } = await supabase.from('agentes').select('nombre, apellidos, correo').in('correo', [miAgente?.correo, ...(miAgente?.agentes_cargo || [])].filter(Boolean));
       const nombresEquipo = new Set([nombreCompleto, ...(equipoAgentes || []).map(a => `${a.nombre || ''} ${a.apellidos || ''}`.trim())].filter(Boolean));

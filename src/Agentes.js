@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from './supabase';
 
-const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Gerente Externo', 'Agente'];
+const ROLES = ['Super Admin', 'Admin', 'Sub Admin', 'Gerente Editor', 'Gerente Operador', 'Mesa de Control', 'Agente'];
 const EDGE_CREAR_USUARIO = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/crear-usuario`;
 const EQUIPOS = ['Gemex', 'Inmobiliaria', 'Asesor externo', 'Desarrollador'];
 const ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
@@ -49,7 +49,7 @@ export default function Agentes() {
   const [msgPass, setMsgPass] = useState('');
   const [passProvisional, setPassProvisional] = useState('');
   const [creandoUsuario, setCreandoUsuario] = useState(false);
-  // FIX: buscador para asignar "agentes a cargo" a un Gerente Externo —
+  // FIX: buscador para asignar "agentes a cargo" a un Mesa de Control —
   // con miles de agentes, un checklist plano no sirve, así que es
   // buscar + agregar, con chips removibles (mismo patrón que el buscador
   // de contactos en Movimientos.js).
@@ -78,7 +78,7 @@ export default function Agentes() {
       whatsapp: '', rol: 'Agente', equipo: 'Gemex',
       codigo_agente: '', inmobiliaria_id: null,
       desarrollos: [], desarrollos_cargo: [], desarrollos_todos: false, foto_url: '', activo: true,
-      // FIX: correos de los agentes que un Gerente Externo tiene a su
+      // FIX: correos de los agentes que un Mesa de Control tiene a su
       // cargo — se asigna manualmente, igual que desarrollos_cargo.
       agentes_cargo: [],
     };
@@ -340,7 +340,7 @@ export default function Agentes() {
   };
 
   // FIX: agrega/quita un agente de la lista de "agentes a cargo" de un
-  // Gerente Externo — se guarda por correo (identificador único de verdad).
+  // Mesa de Control — se guarda por correo (identificador único de verdad).
   const handleToggleAgenteCargo = (correo) => {
     const arr = form.agentes_cargo || [];
     setForm({ ...form, agentes_cargo: arr.includes(correo) ? arr.filter(c => c !== correo) : [...arr, correo] });
@@ -1071,7 +1071,7 @@ export default function Agentes() {
               ) : <span style={{ fontSize: '13px', color: '#ccc' }}>Ninguno</span>}
             </div>
 
-            {showDetalle.rol === 'Gerente Externo' && (
+            {showDetalle.rol === 'Mesa de Control' && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ fontSize: '11px', color: '#888', fontWeight: '500', marginBottom: '10px' }}>AGENTES A SU CARGO</div>
                 {showDetalle.agentes_cargo?.length > 0 ? (
@@ -1173,7 +1173,7 @@ export default function Agentes() {
                 style={{ width: '100%', padding: '10px', border: '0.5px solid #ddd', borderRadius: '6px', fontSize: '14px', background: '#fff' }}>
                 {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
-              {form.rol === 'Gerente Externo' && (
+              {form.rol === 'Mesa de Control' && (
                 <div style={{ fontSize: '11px', color: '#aaa', marginTop: '4px' }}>
                   Trabaja para el desarrollador — solo ve su(s) desarrollo(s) asignado(s) y a los agentes que le asignes abajo.
                 </div>
@@ -1265,8 +1265,8 @@ export default function Agentes() {
             </div>
 
             {/* FIX: el picker de "desarrollos a cargo" ahora también aplica a
-                Gerente Externo (antes solo se mostraba para Gerente Editor) */}
-            {(form.rol === 'Gerente Editor' || form.rol === 'Gerente Externo') && (
+                Mesa de Control (antes solo se mostraba para Gerente Editor) */}
+            {(form.rol === 'Gerente Editor' || form.rol === 'Mesa de Control') && (
               <div style={{ marginBottom: '16px', marginTop: '12px', padding: '12px', background: '#f9f9f9', borderRadius: '8px' }}>
                 <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Desarrollos a su <strong>cargo</strong> (puede editar)</label>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
@@ -1287,9 +1287,9 @@ export default function Agentes() {
             )}
 
             {/* FIX: buscador para armar "agentes a cargo" — solo para
-                Gerente Externo. Con miles de agentes, un checklist plano
+                Mesa de Control. Con miles de agentes, un checklist plano
                 no serviría, así que es buscar + agregar con chips. */}
-            {form.rol === 'Gerente Externo' && (
+            {form.rol === 'Mesa de Control' && (
               <div style={{ marginBottom: '16px', padding: '12px', background: '#f9f9f9', borderRadius: '8px', position: 'relative' }}>
                 <label style={{ fontSize: '11px', color: '#888', display: 'block', marginBottom: '8px' }}>Agentes a su cargo</label>
                 <input placeholder='Buscar agente por nombre o correo...' value={buscarAgenteCargo}

@@ -196,7 +196,7 @@ export default function Contactos() {
   useEffect(() => { cargarMiAgente(); cargarAgentes(); cargarVigencia(); cargarAlertaDias(); cargarDesarrollos(); }, []);
   // FIX: recarga desarrollos una vez que ya se conoce miRol/miAgente —
   // el primer llamado (arriba) corre antes de saber el rol, así que para
-  // Gerente Externo el filtro por desarrollos_cargo no aplicaría a tiempo.
+  // Mesa de Control el filtro por desarrollos_cargo no aplicaría a tiempo.
   useEffect(() => { if (miRol !== null) cargarDesarrollos(); }, [miRol, miAgente]);
   useEffect(() => {
     if (miRol !== null) { cargarContactos(); }
@@ -243,10 +243,10 @@ export default function Contactos() {
 
   // FIX: todos los roles pueden crear contactos para cualquier desarrollo activo,
   // sin restringirse a sus "desarrollos_cargo" o "desarrollos" asignados —
-  // EXCEPTO Gerente Externo, que solo debe ver/usar sus propios desarrollos.
+  // EXCEPTO Mesa de Control, que solo debe ver/usar sus propios desarrollos.
   const cargarDesarrollos = async () => {
     const { data } = await supabase.from('desarrollos').select('*').eq('activo', true).order('nombre');
-    if (miRol === 'Gerente Externo') {
+    if (miRol === 'Mesa de Control') {
       const cargo = miAgente?.desarrollos_cargo || [];
       setDesarrollos((data || []).filter(d => cargo.includes(d.nombre)));
     } else {
@@ -306,7 +306,7 @@ export default function Contactos() {
       if (miRol === 'Agente' || miRol === 'Desarrollador') {
         return c.creado_por === correo || c.asesor_ventas === nombreCompleto;
       }
-      if (miRol === 'Gerente Externo') {
+      if (miRol === 'Mesa de Control') {
         const esDeMiEquipo = c.creado_por === correo || c.asesor_ventas === nombreCompleto || nombresEquipoExterno.includes(c.asesor_ventas);
         return esDeMiEquipo && cargo.includes(c.desarrollo);
       }
@@ -362,8 +362,8 @@ export default function Contactos() {
       } else if (correo) {
         query = query.eq('creado_por', correo);
       } else { setContactos([]); setTotal(0); setLoading(false); return; }
-    } else if (miRol === 'Gerente Externo') {
-      // FIX: Gerente Externo (trabaja para el desarrollador) solo ve
+    } else if (miRol === 'Mesa de Control') {
+      // FIX: Mesa de Control (trabaja para el desarrollador) solo ve
       // contactos de SU GENTE (él + los agentes que tiene a cargo,
       // asignados manualmente), y solo dentro de sus desarrollos
       // asignados — a diferencia de Gerente Editor/Operador, que ven

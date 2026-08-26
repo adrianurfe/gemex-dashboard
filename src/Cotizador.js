@@ -113,7 +113,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
 
     if (ROLES_VER_TODOS.includes(rol)) {
       // sin filtro — ve todos
-    } else if (rol === 'Gerente Externo') {
+    } else if (rol === 'Mesa de Control') {
       const agentesCargoCorreos = miAgenteData.agentes_cargo || [];
       const { data: equipo } = agentesCargoCorreos.length > 0
         ? await supabase.from('agentes').select('nombre, apellidos').in('correo', agentesCargoCorreos)
