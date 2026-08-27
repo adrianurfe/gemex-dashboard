@@ -10,6 +10,20 @@ const OPCIONES_NUM = ['','0','1','1.5','1 a 2','1 a 3','1 a 4','2 a 3','2 a 4','
 const colorEstatus = { Libre: '#27500A', Bloqueado: '#7A5900', Apartado: '#7A3900', Vendido: '#A32D2D' };
 const bgEstatus = { Libre: '#EAF3DE', Bloqueado: '#FFF8E1', Apartado: '#FFF3E0', Vendido: '#FCEBEB' };
 
+// FIX: "No." de unidad puede traer una letra de torre/edificio antes del
+// número (ej. "A101"). parseFloat("A101") da NaN para todas por igual,
+// así que el orden por número quedaba sin efecto real. Se separa el
+// prefijo de letras del número y se compara primero por letra, luego
+// por número (A101, A102... B101, B102...).
+const parseNumeroUnidad = (numero) => {
+  const str = String(numero || '');
+  const match = str.match(/^([A-Za-z]*)(\d*)/);
+  return {
+    prefijo: match ? match[1].toUpperCase() : '',
+    num: match && match[2] ? parseInt(match[2], 10) : 0,
+  };
+};
+
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
   React.useEffect(() => {
@@ -384,9 +398,10 @@ const { data } = await query.limit(5000);
     );
     if (ordenCol === 'numero') {
       lista = [...lista].sort((a, b) => {
-        const na = parseFloat(a.numero) || 0;
-        const nb = parseFloat(b.numero) || 0;
-        return ordenDir === 'asc' ? na - nb : nb - na;
+        const pa = parseNumeroUnidad(a.numero);
+        const pb = parseNumeroUnidad(b.numero);
+        const cmp = pa.prefijo.localeCompare(pb.prefijo) || (pa.num - pb.num);
+        return ordenDir === 'asc' ? cmp : -cmp;
       });
     } else if (ordenCol.startsWith('plan_')) {
       const planId = ordenCol.replace('plan_', '');
