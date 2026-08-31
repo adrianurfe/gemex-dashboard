@@ -6,13 +6,27 @@ const fmt = (n) => `$${Number(n||0).toLocaleString('es-MX', { maximumFractionDig
 // FIX: roles de gerente que solo deben ver sus propios desarrollos a cargo
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 
+// FIX: se agregan metas de Titulación y Cobranza además de Ventas —
+// cada tipo tiene su propio par de columnas (unidades, monto) en la
+// tabla `objetivos`. Un selector cambia cuál se edita/muestra en la
+// misma grilla de desarrollo x mes, para no saturar cada celda con 6
+// números a la vez.
+const TIPOS_META = [
+  { id: 'ventas', label: 'Ventas', colUnidades: 'meta_unidades', colMonto: 'meta_monto' },
+  { id: 'titulacion', label: 'Titulación', colUnidades: 'meta_titulacion_unidades', colMonto: 'meta_titulacion_monto' },
+  { id: 'cobranza', label: 'Cobranza', colUnidades: 'meta_cobranza_unidades', colMonto: 'meta_cobranza_monto' },
+];
+
 export default function Objetivos({ miRol, miAgente }) {
   const [desarrollos, setDesarrollos] = useState([]);
   const [objetivos, setObjetivos] = useState([]);
   const [año, setAño] = useState(new Date().getFullYear());
+  const [tipoMeta, setTipoMeta] = useState('ventas');
   const [editando, setEditando] = useState(null); // { desarrolloId, mes }
-  const [formEdit, setFormEdit] = useState({ meta_unidades: 0, meta_monto: 0 });
+  const [formEdit, setFormEdit] = useState({ unidades: 0, monto: 0 });
   const [guardando, setGuardando] = useState(false);
+
+  const tipo = TIPOS_META.find(t => t.id === tipoMeta);
 
   useEffect(() => { cargarDesarrollos(); }, []);
   useEffect(() => { cargarObjetivos(); }, [año]);
@@ -48,20 +62,21 @@ export default function Objetivos({ miRol, miAgente }) {
 
   const handleEditar = (desarrolloId, mes) => {
     const obj = getObjetivo(desarrolloId, mes);
-    setFormEdit({ meta_unidades: obj?.meta_unidades || 0, meta_monto: obj?.meta_monto || 0 });
+    setFormEdit({ unidades: obj?.[tipo.colUnidades] || 0, monto: obj?.[tipo.colMonto] || 0 });
     setEditando({ desarrolloId, mes });
   };
 
   const handleGuardar = async (desarrolloId, mes, desarrolloNombre) => {
     setGuardando(true);
     const existing = getObjetivo(desarrolloId, mes);
+    const payload = { [tipo.colUnidades]: formEdit.unidades, [tipo.colMonto]: formEdit.monto };
     if (existing) {
-      await supabase.from('objetivos').update(formEdit).eq('id', existing.id);
+      await supabase.from('objetivos').update(payload).eq('id', existing.id);
     } else {
       await supabase.from('objetivos').insert([{
         año, mes, desarrollo_id: desarrolloId,
         desarrollo_nombre: desarrolloNombre,
-        ...formEdit
+        ...payload
       }]);
     }
     setGuardando(false);
@@ -71,34 +86,45 @@ export default function Objetivos({ miRol, miAgente }) {
 
   // Totales por mes
   const totalMes = (mes) => ({
-    unidades: objetivosVisibles.filter(o => o.mes === mes).reduce((s, o) => s + (o.meta_unidades || 0), 0),
-    monto: objetivosVisibles.filter(o => o.mes === mes).reduce((s, o) => s + (o.meta_monto || 0), 0),
+    unidades: objetivosVisibles.filter(o => o.mes === mes).reduce((s, o) => s + (o[tipo.colUnidades] || 0), 0),
+    monto: objetivosVisibles.filter(o => o.mes === mes).reduce((s, o) => s + (o[tipo.colMonto] || 0), 0),
   });
 
   // Totales por desarrollo
   const totalDesarrollo = (desarrolloId) => ({
-    unidades: objetivosVisibles.filter(o => o.desarrollo_id === desarrolloId).reduce((s, o) => s + (o.meta_unidades || 0), 0),
-    monto: objetivosVisibles.filter(o => o.desarrollo_id === desarrolloId).reduce((s, o) => s + (o.meta_monto || 0), 0),
+    unidades: objetivosVisibles.filter(o => o.desarrollo_id === desarrolloId).reduce((s, o) => s + (o[tipo.colUnidades] || 0), 0),
+    monto: objetivosVisibles.filter(o => o.desarrollo_id === desarrolloId).reduce((s, o) => s + (o[tipo.colMonto] || 0), 0),
   });
 
   // Total general
   const totalGeneral = {
-    unidades: objetivosVisibles.reduce((s, o) => s + (o.meta_unidades || 0), 0),
-    monto: objetivosVisibles.reduce((s, o) => s + (o.meta_monto || 0), 0),
+    unidades: objetivosVisibles.reduce((s, o) => s + (o[tipo.colUnidades] || 0), 0),
+    monto: objetivosVisibles.reduce((s, o) => s + (o[tipo.colMonto] || 0), 0),
   };
 
   return (
     <div style={{ padding: '2rem' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h2 style={{ fontSize: '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Objetivos Anuales {año}</h2>
-          <div style={{ fontSize: '13px', color: '#888' }}>Define las metas de ventas por proyecto y mes</div>
+          <div style={{ fontSize: '13px', color: '#888' }}>Define las metas de {tipo.label.toLowerCase()} por proyecto y mes</div>
         </div>
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button onClick={() => setAño(a => a - 1)} style={btnOutline}>← {año - 1}</button>
           <span style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e', padding: '0 8px' }}>{año}</span>
           <button onClick={() => setAño(a => a + 1)} style={btnOutline}>{año + 1} →</button>
         </div>
+      </div>
+
+      {/* Selector de tipo de meta */}
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '1.5rem' }}>
+        {TIPOS_META.map(t => (
+          <button key={t.id} onClick={() => { setTipoMeta(t.id); setEditando(null); }}
+            style={{ padding: '8px 18px', borderRadius: '20px', border: '0.5px solid', fontSize: '13px', cursor: 'pointer', fontWeight: '600',
+              background: tipoMeta === t.id ? '#C0203A' : '#fff', color: tipoMeta === t.id ? '#fff' : '#666', borderColor: tipoMeta === t.id ? '#C0203A' : '#ddd' }}>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {ROLES_GERENTE.includes(miRol) && desarrollosPermitidos.length === 0 && (
@@ -138,12 +164,12 @@ export default function Objetivos({ miRol, miAgente }) {
                     <td key={i} style={{ padding: '8px', textAlign: 'center', verticalAlign: 'middle' }}>
                       {isEdit ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <input type='number' value={formEdit.meta_unidades}
-                            onChange={e => setFormEdit({ ...formEdit, meta_unidades: parseInt(e.target.value) || 0 })}
+                          <input type='number' value={formEdit.unidades}
+                            onChange={e => setFormEdit({ ...formEdit, unidades: parseInt(e.target.value) || 0 })}
                             placeholder='Unidades'
                             style={{ width: '80px', padding: '4px 6px', border: '1px solid #C0203A', borderRadius: '4px', fontSize: '11px', textAlign: 'center' }} />
-                          <input type='number' value={formEdit.meta_monto}
-                            onChange={e => setFormEdit({ ...formEdit, meta_monto: parseFloat(e.target.value) || 0 })}
+                          <input type='number' value={formEdit.monto}
+                            onChange={e => setFormEdit({ ...formEdit, monto: parseFloat(e.target.value) || 0 })}
                             placeholder='Monto'
                             style={{ width: '80px', padding: '4px 6px', border: '1px solid #C0203A', borderRadius: '4px', fontSize: '11px', textAlign: 'center' }} />
                           <div style={{ display: 'flex', gap: '2px', justifyContent: 'center' }}>
@@ -161,15 +187,15 @@ export default function Objetivos({ miRol, miAgente }) {
                         <div onClick={() => handleEditar(d.id, i + 1)} style={{ cursor: 'pointer', padding: '4px', borderRadius: '6px', transition: 'background 0.1s' }}
                           onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
                           onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                          {obj ? (
+                          {obj && (obj[tipo.colUnidades] > 0 || obj[tipo.colMonto] > 0) ? (
                             <div style={{ display: 'flex', justifyContent: 'space-around', alignItems: 'center', gap: '4px' }}>
                               <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontWeight: '700', color: '#1a1a2e', fontSize: '13px' }}>{obj.meta_unidades}</div>
+                                <div style={{ fontWeight: '700', color: '#1a1a2e', fontSize: '13px' }}>{obj[tipo.colUnidades] || 0}</div>
                                 <div style={{ fontSize: '9px', color: '#aaa' }}>ud</div>
                               </div>
                               <div style={{ width: '1px', height: '24px', background: '#e0e0e0' }} />
                               <div style={{ textAlign: 'center' }}>
-                                <div style={{ fontWeight: '600', color: '#555', fontSize: '11px' }}>{fmt(obj.meta_monto)}</div>
+                                <div style={{ fontWeight: '600', color: '#555', fontSize: '11px' }}>{fmt(obj[tipo.colMonto])}</div>
                                 <div style={{ fontSize: '9px', color: '#aaa' }}>monto</div>
                               </div>
                             </div>
@@ -196,7 +222,7 @@ export default function Objetivos({ miRol, miAgente }) {
                 const t = totalMes(i + 1);
                 return (
                   <td key={i} style={{ padding: '8px', textAlign: 'center' }}>
-                    {t.unidades > 0 ? (
+                    {t.unidades > 0 || t.monto > 0 ? (
                       <div style={{ display: 'flex', justifyContent: 'space-around' }}>
                         <div style={{ textAlign: 'center' }}>
                           <div style={{ fontWeight: '700', color: '#1a1a2e' }}>{t.unidades}</div>
@@ -224,11 +250,11 @@ export default function Objetivos({ miRol, miAgente }) {
       {/* Consolidado */}
       <div style={{ marginTop: '16px', background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: '1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px' }}>
         <div>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>TOTAL META UNIDADES {año}</div>
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>TOTAL META UNIDADES · {tipo.label.toUpperCase()} {año}</div>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#1a1a2e' }}>{totalGeneral.unidades}</div>
         </div>
         <div>
-          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>TOTAL META MONTO {año}</div>
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>TOTAL META MONTO · {tipo.label.toUpperCase()} {año}</div>
           <div style={{ fontSize: '28px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(totalGeneral.monto)}</div>
         </div>
       </div>

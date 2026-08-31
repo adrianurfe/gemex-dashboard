@@ -39,6 +39,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const [desarrollos, setDesarrollos] = useState([]);
   const [objetivosData, setObjetivosData] = useState([]);
   const [inventario, setInventario] = useState({ libre: 0, total: 0 });
+  const [apartados, setApartados] = useState({ count: 0, monto: 0 });
   const [desarrolloSel, setDesarrolloSel] = useState('');
   // FIX: filtro para ver solo ventas de equipo Gemex o solo de
   // externos (inmobiliarias y asesores independientes)
@@ -63,7 +64,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const nombresPermitidos = desarrollosPermitidos.map(d => d.nombre);
 
   useEffect(() => { cargarMovimientosYDesarrollos(); cargarAgentesEquipo(); }, []);
-  useEffect(() => { cargarInventario(); }, [desarrolloSel, desarrollos]);
+  useEffect(() => { cargarInventario(); cargarApartados(); }, [desarrolloSel, desarrollos]);
   useEffect(() => { cargarObjetivos(); }, [anioSel]);
   useEffect(() => { procesarGrafica(); }, [movimientos, periodo, desarrolloSel, anioSel]);
 
@@ -140,6 +141,38 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const cargarObjetivos = async () => {
     const { data } = await supabase.from('objetivos').select('*').eq('año', anioSel);
     setObjetivosData(data || []);
+  };
+
+  // FIX: "Apartados activos" en el dashboard — se lee directo del estatus
+  // actual de Inventario (que Movimientos.js ya mantiene al día), así que
+  // cuando un apartado se convierte en Venta o se Cancela, la unidad deja
+  // de tener estatus='Apartado' y desaparece de este conteo solo, sin
+  // necesitar lógica aparte para "restar" el histórico.
+  const cargarApartados = async () => {
+    let query = supabase.from('inventario').select('id').eq('estatus', 'Apartado');
+    let devId = null;
+    if (desarrolloSel) {
+      const dev = desarrollos.find(d => d.nombre === desarrolloSel);
+      if (!dev) { setApartados({ count: 0, monto: 0 }); return; }
+      devId = dev.id;
+      query = query.eq('desarrollo_id', devId);
+    } else if (ROLES_GERENTE.includes(miRol)) {
+      const idsPermitidos = desarrollosPermitidos.map(d => d.id);
+      if (idsPermitidos.length === 0) { setApartados({ count: 0, monto: 0 }); return; }
+      query = query.in('desarrollo_id', idsPermitidos);
+    }
+    const { data: unidades } = await query;
+    const ids = (unidades || []).map(u => u.id);
+    if (ids.length === 0) { setApartados({ count: 0, monto: 0 }); return; }
+    const { data: movs } = await supabase.from('movimientos').select('unidad_id, monto')
+      .eq('tipo', 'Apartado').in('unidad_id', ids).order('created_at', { ascending: false });
+    // FIX: si por alguna razón hay más de un movimiento "Apartado" para la
+    // misma unidad (no debería, pero por si acaso), solo cuenta el más
+    // reciente por unidad — order desc + Map se queda con el primero visto.
+    const montoPorUnidad = new Map();
+    (movs || []).forEach(m => { if (!montoPorUnidad.has(m.unidad_id)) montoPorUnidad.set(m.unidad_id, Number(m.monto || 0)); });
+    const monto = [...montoPorUnidad.values()].reduce((s, v) => s + v, 0);
+    setApartados({ count: ids.length, monto });
   };
 
   // FIX: los objetivos ahora respetan tanto el desarrollo seleccionado
@@ -521,13 +554,19 @@ export default function DashboardDireccion({ miRol, miAgente }) {
         )}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
         <Tarjeta label="Unidades Vendidas" valor={totalVendidas}
           meta={objetivos.unidades > 0 ? `Meta: ${objetivos.unidades}` : null}
           pctLabel="Progreso" pct={pctU} color="#10B981" />
         <Tarjeta label="Monto Vendido" valor={fmt(totalMonto)}
           meta={objetivos.monto > 0 ? `Meta: ${fmt(objetivos.monto)}` : null}
           pctLabel="Progreso" pct={pctM} color="#10B981" />
+        <div style={{ background: '#fff', border: '2px solid #EC4899', borderRadius: '12px', padding: isMobile ? '12px' : '16px', position: 'relative' }}>
+          <div style={{ position: 'absolute', top: '10px', right: '10px', width: '8px', height: '8px', borderRadius: '50%', background: '#EC4899' }} />
+          <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Apartados Activos</div>
+          <div style={{ fontSize: isMobile ? '20px' : '24px', fontWeight: '700', color: '#1a1a2e' }}>{apartados.count}</div>
+          <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>{fmt(apartados.monto)} en proceso</div>
+        </div>
         <Tarjeta label="Disponibilidad" valor={inventario.libre}
           meta={`De ${inventario.total} totales`}
           pctLabel="Libres" pct={pctDisp} color="#e0e0e0" barColor="#3B82F6" />
