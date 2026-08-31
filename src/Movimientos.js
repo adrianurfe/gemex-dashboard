@@ -161,6 +161,34 @@ export default function Movimientos() {
     setVendedorSel(ag ? `${ag.nombre} ${ag.apellidos}`.trim() : '');
   };
 
+  // FIX: al Apartar/Vender una unidad, el precio de lista se pone en 0 en
+  // Inventario (no debe seguir mostrándose una vez que no está disponible),
+  // respaldando el precio real en precio_lista_respaldo para poder
+  // restaurarlo si se Cancela el movimiento o hay un Cambio de Unidad.
+  const aplicarEstatusUnidad = async (unidadId, nuevoEstatus) => {
+    const { data: unidad } = await supabase.from('inventario')
+      .select('precio_lista, precio_lista_respaldo, m2_total').eq('id', unidadId).single();
+    if (!unidad) return;
+
+    if (nuevoEstatus === 'Apartado' || nuevoEstatus === 'Vendido') {
+      const respaldo = unidad.precio_lista > 0 ? unidad.precio_lista : unidad.precio_lista_respaldo;
+      await supabase.from('inventario').update({
+        estatus: nuevoEstatus, precio_lista: 0, precio: 0, precio_m2: 0,
+        precio_lista_respaldo: respaldo || null,
+      }).eq('id', unidadId);
+    } else if (nuevoEstatus === 'Libre') {
+      const precioRestaurado = unidad.precio_lista_respaldo || 0;
+      const m2 = Number(unidad.m2_total) || 0;
+      const precioM2Restaurado = m2 > 0 ? Math.round((precioRestaurado / m2) * 100) / 100 : 0;
+      await supabase.from('inventario').update({
+        estatus: 'Libre', precio_lista: precioRestaurado, precio: precioRestaurado,
+        precio_m2: precioM2Restaurado, precio_lista_respaldo: null,
+      }).eq('id', unidadId);
+    } else {
+      await supabase.from('inventario').update({ estatus: nuevoEstatus }).eq('id', unidadId);
+    }
+  };
+
   const handleGuardar = async () => {
     // FIX: los Gerentes no pueden cargar movimientos fuera de la ventana
     // martes-a-lunes (hasta la hora configurada por Super Admin)
@@ -191,8 +219,8 @@ export default function Movimientos() {
     else if (tipo === 'Cancelación') nuevoEstatus = 'Libre';
     else if (tipo === 'Cambio de Unidad') nuevoEstatus = 'Libre';
 
-    if (nuevoEstatus) await supabase.from('inventario').update({ estatus: nuevoEstatus }).eq('id', form.unidad_id);
-    if (tipo === 'Cambio de Unidad' && form.nueva_unidad_id) await supabase.from('inventario').update({ estatus: 'Apartado' }).eq('id', form.nueva_unidad_id);
+    if (nuevoEstatus) await aplicarEstatusUnidad(form.unidad_id, nuevoEstatus);
+    if (tipo === 'Cambio de Unidad' && form.nueva_unidad_id) await aplicarEstatusUnidad(form.nueva_unidad_id, 'Apartado');
 
     const { error } = await supabase.from('movimientos').insert([{
       tipo, desarrollo_id: form.desarrollo_id, desarrollo_nombre: form.desarrollo_nombre,
