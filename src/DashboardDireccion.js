@@ -187,6 +187,16 @@ export default function DashboardDireccion({ miRol, miAgente }) {
     unidades: objetivosVisibles.reduce((s,o) => s + (o.meta_unidades||0), 0),
     monto: objetivosVisibles.reduce((s,o) => s + (o.meta_monto||0), 0),
   };
+  // FIX: metas de Titulación/Cobranza — mismas columnas de objetivos,
+  // filtradas igual que las de Ventas de arriba.
+  const objetivosTitulacion = {
+    unidades: objetivosVisibles.reduce((s,o) => s + (o.meta_titulacion_unidades||0), 0),
+    monto: objetivosVisibles.reduce((s,o) => s + (o.meta_titulacion_monto||0), 0),
+  };
+  const objetivosCobranza = {
+    unidades: objetivosVisibles.reduce((s,o) => s + (o.meta_cobranza_unidades||0), 0),
+    monto: objetivosVisibles.reduce((s,o) => s + (o.meta_cobranza_monto||0), 0),
+  };
 
   const aniosDisponibles = [...new Set(movimientos.map(m => fechaEfectiva(m)?.getFullYear()).filter(Boolean))].sort((a,b) => b-a);
 
@@ -220,6 +230,21 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const totalMonto = vendidas.reduce((s,m) => s + Number(m.monto||0), 0);
   const pctU = objetivos.unidades > 0 ? Math.min(100, Math.round((totalVendidas/objetivos.unidades)*100)) : 0;
   const pctM = objetivos.monto > 0 ? Math.min(100, Math.round((totalMonto/objetivos.monto)*100)) : 0;
+
+  // FIX: real de Titulación/Cobranza — movimientos de esos tipos ya
+  // registrados desde Movimientos.js, con los mismos filtros de
+  // año/desarrollo/equipo que ya aplica movsFiltrados.
+  const tituladas = movsFiltrados.filter(m => m.tipo === 'Titulación');
+  const totalTituladas = tituladas.length;
+  const totalMontoTitulacion = tituladas.reduce((s,m) => s + Number(m.monto||0), 0);
+  const pctTitU = objetivosTitulacion.unidades > 0 ? Math.min(100, Math.round((totalTituladas/objetivosTitulacion.unidades)*100)) : 0;
+  const pctTitM = objetivosTitulacion.monto > 0 ? Math.min(100, Math.round((totalMontoTitulacion/objetivosTitulacion.monto)*100)) : 0;
+
+  const cobradas = movsFiltrados.filter(m => m.tipo === 'Cobranza');
+  const totalCobradas = cobradas.length;
+  const totalMontoCobranza = cobradas.reduce((s,m) => s + Number(m.monto||0), 0);
+  const pctCobU = objetivosCobranza.unidades > 0 ? Math.min(100, Math.round((totalCobradas/objetivosCobranza.unidades)*100)) : 0;
+  const pctCobM = objetivosCobranza.monto > 0 ? Math.min(100, Math.round((totalMontoCobranza/objetivosCobranza.monto)*100)) : 0;
   const pctDisp = inventario.total > 0 ? Math.round((inventario.libre/inventario.total)*100) : 0;
   const ticketProm = totalVendidas > 0 ? totalMonto / totalVendidas : 0;
 
@@ -575,6 +600,23 @@ export default function DashboardDireccion({ miRol, miAgente }) {
           <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(ticketProm)}</div>
           <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Por unidad vendida</div>
         </div>
+      </div>
+
+      {/* FIX: Titulación y Cobranza — real (movimientos de esos tipos)
+          vs meta (Objetivos), mismo patrón que las tarjetas de Ventas. */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
+        <Tarjeta label="Unidades Tituladas" valor={totalTituladas}
+          meta={objetivosTitulacion.unidades > 0 ? `Meta: ${objetivosTitulacion.unidades}` : null}
+          pctLabel="Progreso" pct={pctTitU} color="#6366F1" />
+        <Tarjeta label="Monto Titulado" valor={fmt(totalMontoTitulacion)}
+          meta={objetivosTitulacion.monto > 0 ? `Meta: ${fmt(objetivosTitulacion.monto)}` : null}
+          pctLabel="Progreso" pct={pctTitM} color="#6366F1" />
+        <Tarjeta label="Unidades Cobradas" valor={totalCobradas}
+          meta={objetivosCobranza.unidades > 0 ? `Meta: ${objetivosCobranza.unidades}` : null}
+          pctLabel="Progreso" pct={pctCobU} color="#14B8A6" />
+        <Tarjeta label="Monto Cobrado" valor={fmt(totalMontoCobranza)}
+          meta={objetivosCobranza.monto > 0 ? `Meta: ${fmt(objetivosCobranza.monto)}` : null}
+          pctLabel="Progreso" pct={pctCobM} color="#14B8A6" />
       </div>
 
       <div style={{ marginBottom: '1.5rem' }}>

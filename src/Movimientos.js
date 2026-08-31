@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
 
-const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad'];
+// FIX: Titulación y Cobranza se agregan como tipos de movimiento
+// posteriores a la Venta — no cambian el estatus de Inventario (la
+// unidad ya está Vendido) y no requieren columnas nuevas: reutilizan
+// monto y fecha_firma (que fechaEfectiva() ya prioriza) para que el
+// Dashboard pueda sumar el "real" por mes contra la meta de Objetivos.
+const TIPOS = ['Apartado', 'Vendida', 'Cancelación', 'Cambio de Unidad', 'Titulación', 'Cobranza'];
+const TIPOS_POST_VENTA = ['Titulación', 'Cobranza'];
 // FIX: se agrega "Especial" — para negociaciones que no entran en las
 // políticas de los demás planes (caso a caso).
 const PLANES_PAGO = ['Hipotecario', 'A tu medida', 'Financiero 1', 'Financiero 2', '50-50', 'Contado', 'Especial'];
@@ -203,7 +209,11 @@ export default function Movimientos() {
     setGuardando(true);
     setMsg('');
 
-    if (tipo !== 'Cancelación') {
+    // FIX: Titulación/Cobranza se registran SOBRE una unidad ya Vendida
+    // (y Cobranza puede repetirse varias veces por pagos parciales), así
+    // que no aplica el candado de "ya tiene un registro activo" — ese
+    // candado es para no Apartar/Vender dos veces la misma unidad.
+    if (tipo !== 'Cancelación' && !TIPOS_POST_VENTA.includes(tipo)) {
       const { data: existentes } = await supabase.from('movimientos').select('id, tipo, contacto_nombre').eq('unidad_id', form.unidad_id).neq('tipo', 'Cancelación');
       if (existentes && existentes.length > 0) {
         const e = existentes[0];
@@ -259,7 +269,12 @@ export default function Movimientos() {
   const tipoEstructura = desarrolloDetalle?.tipo_estructura || 'Etapa';
   const numEstructuras = desarrolloDetalle?.num_estructuras || 1;
   const estructuras = tieneEtapas ? Array.from({ length: numEstructuras }, (_, i) => `${tipoEstructura} ${i + 1}`) : [];
-  const unidadesFiltradas = estructuraSel ? unidades.filter(u => u.estructura === estructuraSel) : unidades;
+  const unidadesEnEstructura = estructuraSel ? unidades.filter(u => u.estructura === estructuraSel) : unidades;
+  // FIX: para Titulación/Cobranza solo tiene sentido elegir unidades que
+  // ya están Vendidas.
+  const unidadesFiltradas = TIPOS_POST_VENTA.includes(tipo)
+    ? unidadesEnEstructura.filter(u => u.estatus === 'Vendido')
+    : unidadesEnEstructura;
   const unidadesNuevas = unidadesFiltradas.filter(u => u.id !== form.unidad_id && u.estatus === 'Libre');
 
   const btnTipo = (t) => (
@@ -409,20 +424,28 @@ export default function Movimientos() {
         </div>
 
         {/* Fechas */}
-        <div style={{ display: 'grid', gridTemplateColumns: tipo === 'Vendida' ? (isMobile ? '1fr' : '1fr 1fr') : '1fr', gap: '12px', marginBottom: '16px' }}>
-          <div>
-            <label style={labelStyle}>Fecha de Apartado</label>
-            <input type='date' value={form.fecha_apartado} onChange={e => setForm({ ...form, fecha_apartado: e.target.value })}
+        {TIPOS_POST_VENTA.includes(tipo) ? (
+          <div style={{ marginBottom: '16px' }}>
+            <label style={labelStyle}>{tipo === 'Titulación' ? 'Fecha de Titulación' : 'Fecha de Cobro'}</label>
+            <input type='date' value={form.fecha_firma} onChange={e => setForm({ ...form, fecha_firma: e.target.value })}
               style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }} />
           </div>
-          {tipo === 'Vendida' && (
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: tipo === 'Vendida' ? (isMobile ? '1fr' : '1fr 1fr') : '1fr', gap: '12px', marginBottom: '16px' }}>
             <div>
-              <label style={labelStyle}>Fecha de Firma</label>
-              <input type='date' value={form.fecha_firma} onChange={e => setForm({ ...form, fecha_firma: e.target.value })}
+              <label style={labelStyle}>Fecha de Apartado</label>
+              <input type='date' value={form.fecha_apartado} onChange={e => setForm({ ...form, fecha_apartado: e.target.value })}
                 style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }} />
             </div>
-          )}
-        </div>
+            {tipo === 'Vendida' && (
+              <div>
+                <label style={labelStyle}>Fecha de Firma</label>
+                <input type='date' value={form.fecha_firma} onChange={e => setForm({ ...form, fecha_firma: e.target.value })}
+                  style={{ ...inputStyle, padding: isMobile ? '12px' : '9px 12px' }} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Comisionable */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
