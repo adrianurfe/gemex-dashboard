@@ -231,22 +231,70 @@ export default function DashboardDireccion({ miRol, miAgente }) {
   const pctU = objetivos.unidades > 0 ? Math.min(100, Math.round((totalVendidas/objetivos.unidades)*100)) : 0;
   const pctM = objetivos.monto > 0 ? Math.min(100, Math.round((totalMonto/objetivos.monto)*100)) : 0;
 
-  // FIX: real de Titulación/Cobranza — movimientos de esos tipos ya
-  // registrados desde Movimientos.js, con los mismos filtros de
-  // año/desarrollo/equipo que ya aplica movsFiltrados.
-  const tituladas = movsFiltrados.filter(m => m.tipo === 'Titulación');
-  const totalTituladas = tituladas.length;
-  const totalMontoTitulacion = tituladas.reduce((s,m) => s + Number(m.monto||0), 0);
-  const pctTitU = objetivosTitulacion.unidades > 0 ? Math.min(100, Math.round((totalTituladas/objetivosTitulacion.unidades)*100)) : 0;
-  const pctTitM = objetivosTitulacion.monto > 0 ? Math.min(100, Math.round((totalMontoTitulacion/objetivosTitulacion.monto)*100)) : 0;
-
-  const cobradas = movsFiltrados.filter(m => m.tipo === 'Cobranza');
-  const totalCobradas = cobradas.length;
-  const totalMontoCobranza = cobradas.reduce((s,m) => s + Number(m.monto||0), 0);
-  const pctCobU = objetivosCobranza.unidades > 0 ? Math.min(100, Math.round((totalCobradas/objetivosCobranza.unidades)*100)) : 0;
-  const pctCobM = objetivosCobranza.monto > 0 ? Math.min(100, Math.round((totalMontoCobranza/objetivosCobranza.monto)*100)) : 0;
   const pctDisp = inventario.total > 0 ? Math.round((inventario.libre/inventario.total)*100) : 0;
   const ticketProm = totalVendidas > 0 ? totalMonto / totalVendidas : 0;
+
+  // FIX: el Consolidado (tarjetas de arriba) ahora tambien se puede ver
+  // por Semana/Mes además de por Año — reutiliza el mismo selector
+  // `periodo` que ya manejaban las gráficas de abajo. "vendidas" /
+  // "totalVendidas" / etc. de arriba se DEJAN intactas (siguen siendo
+  // el total del año, las usan la tabla mensual y el PDF); estas de
+  // aquí son variables nuevas y paralelas, solo para las tarjetas.
+  const rangoConsolidado = (() => {
+    const hoy = new Date(); hoy.setHours(23,59,59,999);
+    if (periodo === 'semana') {
+      const inicio = new Date(); inicio.setDate(inicio.getDate() - 6); inicio.setHours(0,0,0,0);
+      return { inicio, fin: hoy };
+    }
+    if (periodo === 'mes') {
+      const inicio = new Date(); inicio.setDate(inicio.getDate() - 29); inicio.setHours(0,0,0,0);
+      return { inicio, fin: hoy };
+    }
+    return { inicio: new Date(anioSel, 0, 1), fin: new Date(anioSel, 11, 31, 23, 59, 59, 999) };
+  })();
+  const movsPeriodo = movsFiltrados.filter(m => { const f = fechaEfectiva(m); return f && f >= rangoConsolidado.inicio && f <= rangoConsolidado.fin; });
+
+  const vendidasP = movsPeriodo.filter(m => m.tipo === 'Vendida');
+  const totalVendidasP = vendidasP.length;
+  const totalMontoP = vendidasP.reduce((s,m) => s + Number(m.monto||0), 0);
+  const ticketPromP = totalVendidasP > 0 ? totalMontoP / totalVendidasP : 0;
+
+  const tituladasP = movsPeriodo.filter(m => m.tipo === 'Titulación');
+  const totalTituladasP = tituladasP.length;
+  const totalMontoTitulacionP = tituladasP.reduce((s,m) => s + Number(m.monto||0), 0);
+
+  const cobradasP = movsPeriodo.filter(m => m.tipo === 'Cobranza');
+  const totalCobradasP = cobradasP.length;
+  const totalMontoCobranzaP = cobradasP.reduce((s,m) => s + Number(m.monto||0), 0);
+
+  // FIX: la meta contra la que se compara también depende del periodo —
+  // en Año se usa la meta del año completo (ya calculada arriba); en Mes
+  // se usa solo la meta del mes en curso (más justo que comparar contra
+  // el año entero); en Semana no existe un concepto de "meta semanal" en
+  // Objetivos, así que se omite la comparación (barra en 0, sin "Meta:").
+  const objetivosMesActual = objetivosData.filter(o => o.mes === mesActual &&
+    (!desarrolloSel || o.desarrollo_nombre === desarrolloSel) &&
+    (desarrolloSel || nombresPermitidos.includes(o.desarrollo_nombre) || nombresPermitidos.length === desarrollos.length));
+  const sumMes = (col) => objetivosMesActual.reduce((s,o) => s + (o[col]||0), 0);
+  const metaMesActual = {
+    ventas: { unidades: sumMes('meta_unidades'), monto: sumMes('meta_monto') },
+    titulacion: { unidades: sumMes('meta_titulacion_unidades'), monto: sumMes('meta_titulacion_monto') },
+    cobranza: { unidades: sumMes('meta_cobranza_unidades'), monto: sumMes('meta_cobranza_monto') },
+  };
+  const metaSegunPeriodo = (metaAnual, metaMensual) =>
+    periodo === 'año' ? metaAnual : periodo === 'mes' ? metaMensual : { unidades: 0, monto: 0 };
+
+  const metaVentasP = metaSegunPeriodo(objetivos, metaMesActual.ventas);
+  const metaTitulacionP = metaSegunPeriodo(objetivosTitulacion, metaMesActual.titulacion);
+  const metaCobranzaP = metaSegunPeriodo(objetivosCobranza, metaMesActual.cobranza);
+
+  const pct = (real, meta) => meta > 0 ? Math.min(100, Math.round((real/meta)*100)) : 0;
+  const pctUP = pct(totalVendidasP, metaVentasP.unidades);
+  const pctMP = pct(totalMontoP, metaVentasP.monto);
+  const pctTitUP = pct(totalTituladasP, metaTitulacionP.unidades);
+  const pctTitMP = pct(totalMontoTitulacionP, metaTitulacionP.monto);
+  const pctCobUP = pct(totalCobradasP, metaCobranzaP.unidades);
+  const pctCobMP = pct(totalMontoCobranzaP, metaCobranzaP.monto);
 
   const tablaObjetivosMes = MESES.map((nombreMes, i) => {
     const mesNum = i + 1;
@@ -579,13 +627,24 @@ export default function DashboardDireccion({ miRol, miAgente }) {
         )}
       </div>
 
+      <div style={{ display: 'flex', gap: '6px', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{ fontSize: '12px', color: '#888', marginRight: '2px' }}>Consolidado:</span>
+        {['semana','mes','año'].map(p => (
+          <button key={p} onClick={() => setPeriodo(p)}
+            style={{ padding: isMobile ? '8px 14px' : '4px 14px', borderRadius: '20px', border: '0.5px solid', fontSize: isMobile ? '13px' : '12px', cursor: 'pointer',
+              background: periodo === p ? '#C0203A' : '#fff', color: periodo === p ? '#fff' : '#666', borderColor: periodo === p ? '#C0203A' : '#ddd' }}>
+            {LABELS_P[p]}
+          </button>
+        ))}
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(5, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
-        <Tarjeta label="Unidades Vendidas" valor={totalVendidas}
-          meta={objetivos.unidades > 0 ? `Meta: ${objetivos.unidades}` : null}
-          pctLabel="Progreso" pct={pctU} color="#10B981" />
-        <Tarjeta label="Monto Vendido" valor={fmt(totalMonto)}
-          meta={objetivos.monto > 0 ? `Meta: ${fmt(objetivos.monto)}` : null}
-          pctLabel="Progreso" pct={pctM} color="#10B981" />
+        <Tarjeta label="Unidades Vendidas" valor={totalVendidasP}
+          meta={metaVentasP.unidades > 0 ? `Meta: ${metaVentasP.unidades}` : null}
+          pctLabel="Progreso" pct={pctUP} color="#10B981" />
+        <Tarjeta label="Monto Vendido" valor={fmt(totalMontoP)}
+          meta={metaVentasP.monto > 0 ? `Meta: ${fmt(metaVentasP.monto)}` : null}
+          pctLabel="Progreso" pct={pctMP} color="#10B981" />
         <div style={{ background: '#fff', border: '2px solid #EC4899', borderRadius: '12px', padding: isMobile ? '12px' : '16px', position: 'relative' }}>
           <div style={{ position: 'absolute', top: '10px', right: '10px', width: '8px', height: '8px', borderRadius: '50%', background: '#EC4899' }} />
           <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Apartados Activos</div>
@@ -597,7 +656,7 @@ export default function DashboardDireccion({ miRol, miAgente }) {
           pctLabel="Libres" pct={pctDisp} color="#e0e0e0" barColor="#3B82F6" />
         <div style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '12px', padding: isMobile ? '12px' : '16px' }}>
           <div style={{ fontSize: '11px', color: '#888', marginBottom: '4px' }}>Ticket Promedio</div>
-          <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(ticketProm)}</div>
+          <div style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(ticketPromP)}</div>
           <div style={{ fontSize: '11px', color: '#888', marginTop: '4px' }}>Por unidad vendida</div>
         </div>
       </div>
@@ -605,18 +664,18 @@ export default function DashboardDireccion({ miRol, miAgente }) {
       {/* FIX: Titulación y Cobranza — real (movimientos de esos tipos)
           vs meta (Objetivos), mismo patrón que las tarjetas de Ventas. */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4, 1fr)', gap: '10px', marginBottom: '1.5rem' }}>
-        <Tarjeta label="Unidades Tituladas" valor={totalTituladas}
-          meta={objetivosTitulacion.unidades > 0 ? `Meta: ${objetivosTitulacion.unidades}` : null}
-          pctLabel="Progreso" pct={pctTitU} color="#6366F1" />
-        <Tarjeta label="Monto Titulado" valor={fmt(totalMontoTitulacion)}
-          meta={objetivosTitulacion.monto > 0 ? `Meta: ${fmt(objetivosTitulacion.monto)}` : null}
-          pctLabel="Progreso" pct={pctTitM} color="#6366F1" />
-        <Tarjeta label="Unidades Cobradas" valor={totalCobradas}
-          meta={objetivosCobranza.unidades > 0 ? `Meta: ${objetivosCobranza.unidades}` : null}
-          pctLabel="Progreso" pct={pctCobU} color="#14B8A6" />
-        <Tarjeta label="Monto Cobrado" valor={fmt(totalMontoCobranza)}
-          meta={objetivosCobranza.monto > 0 ? `Meta: ${fmt(objetivosCobranza.monto)}` : null}
-          pctLabel="Progreso" pct={pctCobM} color="#14B8A6" />
+        <Tarjeta label="Unidades Tituladas" valor={totalTituladasP}
+          meta={metaTitulacionP.unidades > 0 ? `Meta: ${metaTitulacionP.unidades}` : null}
+          pctLabel="Progreso" pct={pctTitUP} color="#6366F1" />
+        <Tarjeta label="Monto Titulado" valor={fmt(totalMontoTitulacionP)}
+          meta={metaTitulacionP.monto > 0 ? `Meta: ${fmt(metaTitulacionP.monto)}` : null}
+          pctLabel="Progreso" pct={pctTitMP} color="#6366F1" />
+        <Tarjeta label="Unidades Cobradas" valor={totalCobradasP}
+          meta={metaCobranzaP.unidades > 0 ? `Meta: ${metaCobranzaP.unidades}` : null}
+          pctLabel="Progreso" pct={pctCobUP} color="#14B8A6" />
+        <Tarjeta label="Monto Cobrado" valor={fmt(totalMontoCobranzaP)}
+          meta={metaCobranzaP.monto > 0 ? `Meta: ${fmt(metaCobranzaP.monto)}` : null}
+          pctLabel="Progreso" pct={pctCobMP} color="#14B8A6" />
       </div>
 
       <div style={{ marginBottom: '1.5rem' }}>
@@ -769,16 +828,6 @@ export default function DashboardDireccion({ miRol, miAgente }) {
             </tr>
           </tbody>
         </table>
-      </div>
-
-      <div style={{ display: 'flex', gap: '6px', marginBottom: '1rem' }}>
-        {['semana','mes','año'].map(p => (
-          <button key={p} onClick={() => setPeriodo(p)}
-            style={{ padding: isMobile ? '8px 14px' : '4px 14px', borderRadius: '20px', border: '0.5px solid', fontSize: isMobile ? '13px' : '12px', cursor: 'pointer',
-              background: periodo === p ? '#C0203A' : '#fff', color: periodo === p ? '#fff' : '#666', borderColor: periodo === p ? '#C0203A' : '#ddd' }}>
-            {LABELS_P[p]}
-          </button>
-        ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '1.5rem' }}>
