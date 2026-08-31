@@ -321,9 +321,9 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
       {planes.length > 0 && (
         <div>
           <div style={{ fontSize: '13px', fontWeight: '700', color: '#1a1a2e', marginBottom: '12px' }}>Opciones de pago por unidad</div>
-          <div style={{ display: 'grid', gridTemplateColumns: `repeat(${listaUnidades.length}, 1fr)`, gap: '16px' }}>
+          <div style={{ display: 'flex', gap: '16px' }}>
             {listaUnidades.map(u => (
-              <div key={u.id}>
+              <div key={u.id} style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: '12px', fontWeight: '700', color: '#1a1a2e', marginBottom: '8px', textAlign: 'center', background: '#f0f0f0', padding: '6px', borderRadius: '4px' }}>
                   Unidad {u.numero} — {fmt(u.precio_lista)}
                 </div>
@@ -370,10 +370,10 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
     return (
       <div ref={cotizacionRef} style={{
         background: '#fff', width: '816px', height: '1056px', padding: '36px',
-        boxSizing: 'border-box', display: 'grid', gridTemplateColumns: '1fr 1fr',
-        gap: '28px', fontFamily: 'Arial, sans-serif', position: 'relative'
+        boxSizing: 'border-box', display: 'flex', gap: '28px',
+        fontFamily: 'Arial, sans-serif', position: 'relative'
       }}>
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minWidth: 0 }}>
           <div style={{ textAlign: 'center', marginBottom: '20px' }}>
             {desarrollo.logo_url
               ? <img src={desarrollo.logo_url} alt={desarrollo.nombre} style={{ maxHeight: '80px', maxWidth: '180px', objectFit: 'contain' }} />
@@ -386,16 +386,16 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
               <div style={{ fontSize: '18px', fontWeight: '700', color: '#333' }}>{fmt(precio)} MXN</div>
             </div>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px', fontSize: '10px', color: '#333', marginBottom: '14px' }}>
-            <div>No. UNIDAD: {u?.numero}</div>
-            <div>M² UNIDAD: {u?.m2_interior}</div>
-            <div>NIVEL: {u?.nivel}</div>
-            <div>M² TERRAZA: {u?.m2_terraza}</div>
-            <div>RECÁMARAS: {u?.recamaras}</div>
-            <div>BODEGA: {u?.m2_bodega}</div>
-            <div>SUP TOTAL: {u?.m2_total} M²</div>
-            <div>CAJONES: {u?.estacionamiento}</div>
-            <div>PRECIO POR M²: {fmt(u?.precio_m2)}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', fontSize: '10px', color: '#333', marginBottom: '14px' }}>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>No. UNIDAD: {u?.numero}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>M² UNIDAD: {u?.m2_interior}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>NIVEL: {u?.nivel}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>M² TERRAZA: {u?.m2_terraza}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>RECÁMARAS: {u?.recamaras}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>BODEGA: {u?.m2_bodega}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>SUP TOTAL: {u?.m2_total} M²</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>CAJONES: {u?.estacionamiento}</div>
+            <div style={{ width: '50%', boxSizing: 'border-box', paddingBottom: '3px' }}>PRECIO POR M²: {fmt(u?.precio_m2)}</div>
           </div>
           {detalles.length > 0 && (
             <div style={{ marginBottom: '14px' }}>
@@ -429,7 +429,7 @@ export default function Cotizador({ unidad, unidades: unidadesMultiple, desarrol
             Todos los precios y áreas descritas en la presente cotización son estimados. Los valores y condiciones de esta Propuesta están sujetos a modificación sin previo aviso. Esta propuesta es valida por 24 horas apartir de la siguiente fecha: {fechaActual}
           </div>
         </div>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: '16px', fontWeight: '700', color: '#333', marginBottom: '14px', textAlign: 'center' }}>Opciones de pago</div>
           {planes.length === 0 ? (
             <div style={{ fontSize: '12px', color: '#888', textAlign: 'center', padding: '2rem' }}>No hay planes activos configurados</div>
