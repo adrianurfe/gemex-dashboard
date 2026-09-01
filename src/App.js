@@ -12,11 +12,12 @@ import BuyerPersona from './BuyerPersona';
 import HistorialMovimientos from './HistorialMovimientos';
 import DashboardDireccion from './DashboardDireccion';
 import Expedientes from './Expedientes';
+import Titulacion from './Titulacion';
 // Iconos de línea (lucide-react) en lugar de emojis en todo el sidebar.
 import {
   Trophy, Contact, Briefcase, Building2, Users, Folder,
   Target, Building, LineChart,
-  ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck,
+  ArrowLeftRight, FileText, ShieldCheck, Settings, LogOut, Flame, UserCheck, ClipboardCheck,
 } from 'lucide-react';
 
 const MENU_COMPLETO = [
@@ -30,6 +31,7 @@ const MENU_COMPLETO = [
     { id: 'dashboard_dir', label: 'Dashboard', icon: 'dashboard_dir' },
     { id: 'movimientos', label: 'Movimientos', icon: 'movimientos' },
     { id: 'historial', label: 'Historial', icon: 'historial' },
+    { id: 'titulacion', label: 'Titulación', icon: 'titulacion' },
     { id: 'objetivos', label: 'Objetivos', icon: 'objetivos' },
     { id: 'tendencias_producto', label: 'Tendencias', icon: 'tendencias_producto' },
     { id: 'buyer_persona', label: 'Buyer Persona', icon: 'buyer_persona' },
@@ -90,6 +92,7 @@ const MENU_ICONS = {
   movimientos: <ArrowLeftRight size={18} />,
   dashboard_dir: <LineChart size={18} />,
   historial: <FileText size={18} />,
+  titulacion: <ClipboardCheck size={18} />,
   objetivos: <Target size={18} />,
   tendencias_producto: <Flame size={18} />,
   buyer_persona: <UserCheck size={18} />,
@@ -716,6 +719,7 @@ function App() {
       case 'dashboard_dir': return <DashboardDireccion miRol={miRol} miAgente={miAgente} />;
       case 'historial': return (miRol === 'Super Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador' || miRol === 'Mesa de Control') ? <HistorialMovimientos miRol={miRol} miAgente={miAgente} /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'objetivos': return <Objetivos miRol={miRol} miAgente={miAgente} />;
+      case 'titulacion': return <Titulacion miRol={miRol} miAgente={miAgente} />;
       case 'tendencias_producto': return miRol === 'Super Admin' ? <TendenciasProducto /> : <Desarrollos miRol={miRol} miAgente={miAgente} />;
       case 'buyer_persona':
         return (miRol === 'Super Admin' || miRol === 'Admin' || miRol === 'Gerente Editor' || miRol === 'Gerente Operador')
