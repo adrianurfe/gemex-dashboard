@@ -86,11 +86,15 @@ export default function Titulacion({ miRol, miAgente }) {
     const { data: des } = await supabase.from('desarrollos').select('id, nombre').eq('activo', true).order('nombre');
     setDesarrollos(des || []);
 
+    const mapaNombres = {};
+    (des || []).forEach(d => { mapaNombres[d.id] = d.nombre; });
+
     const { data: inv } = await supabase.from('inventario')
-      .select('id, numero, desarrollo_id, desarrollo_nombre, precio_lista_respaldo')
+      .select('id, numero, desarrollo_id, precio_lista_respaldo')
       .eq('estatus', 'Vendido')
       .order('numero');
-    setUnidades(inv || []);
+    const invConNombre = (inv || []).map(u => ({ ...u, desarrollo_nombre: mapaNombres[u.desarrollo_id] || '' }));
+    setUnidades(invConNombre);
 
     const unidadIds = (inv || []).map(u => u.id);
     if (unidadIds.length > 0) {
