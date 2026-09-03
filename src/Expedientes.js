@@ -404,10 +404,10 @@ export default function Expedientes({ miRol, miAgente }) {
     setNuevosResponsables(lista);
   };
 
-  // FIX: los responsables de expedientes ahora también pueden ser Admin,
-  // no solo Super Admin (antes el filtro era rol = 'Super Admin' a secas).
+  // FIX: los responsables de expedientes ahora también pueden ser Admin
+  // o Mesa de Control, no solo Super Admin.
   const cargarSuperAdmins = async () => {
-    const { data } = await supabase.from('agentes').select('correo, nombre, apellidos, rol').in('rol', ['Super Admin', 'Admin']).eq('activo', true).order('nombre');
+    const { data } = await supabase.from('agentes').select('correo, nombre, apellidos, rol').in('rol', ['Super Admin', 'Admin', 'Mesa de Control']).eq('activo', true).order('nombre');
     setSuperAdmins(data || []);
   };
 
@@ -420,7 +420,7 @@ export default function Expedientes({ miRol, miAgente }) {
   const toggleResponsableSel = (correo) => {
     setNuevosResponsables(prev => {
       if (prev.includes(correo)) return prev.filter(c => c !== correo);
-      if (prev.length >= 2) return prev; // máximo 2
+      if (prev.length >= 4) return prev; // máximo 4
       return [...prev, correo];
     });
   };
@@ -1189,7 +1189,7 @@ export default function Expedientes({ miRol, miAgente }) {
           <div style={{ background: '#fff', borderRadius: '12px', padding: '2rem', maxWidth: '380px', width: '100%' }} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: '16px', fontWeight: '600', color: '#1a1a2e', marginBottom: '8px' }}>Responsables de expedientes</div>
             <div style={{ fontSize: '13px', color: '#666', marginBottom: '1.25rem' }}>
-              Elige hasta 2 (Super Admin o Admin). Reciben el aviso cuando un expediente lleva más de {MESES_PARA_ARCHIVAR} meses sin archivar.
+              Elige hasta 4 (Super Admin, Admin o Mesa de Control). Reciben el aviso cuando un expediente lleva más de {MESES_PARA_ARCHIVAR} meses sin archivar.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '1.5rem', maxHeight: '240px', overflowY: 'auto' }}>
               {superAdmins.map(a => (
