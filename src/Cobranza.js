@@ -1,22 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import jsPDF from 'jspdf';
 import { supabase } from './supabase';
 
-// FIX: segunda fase del proceso de Titulación y Cobranza (dinero), pedido
-// por el equipo vía notas a mano. Por unidad Vendida se captura Valor
-// venta / Tipo de crédito, una lista de abonos de enganche que Tesorería
-// va agregando (fecha + monto), y los montos de las financieras. La
-// fórmula sigue el orden de las notas:
-//   Diferencia por cubrir = Valor venta - total de abonos
-//   Saldo neto = Diferencia por cubrir - Financiera 1 - Financiera 2
-//   Remanente = Financiera 1 + Financiera 2 - Liberación
+// FIX: Cliente asignado, Valor venta y Tipo de compra ya NO se capturan
+// aquí — se leen en vivo del movimiento 'Vendida' de la unidad (fuente
+// única de verdad). cobranza_seguimiento solo guarda lo que es propio de
+// Cobranza: Financiera 1/2 y Liberación. Cada abono (cobranza_pagos)
+// puede llevar un comprobante adjunto (bucket privado 'cobranza').
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
-const TIPO_CREDITO_OPCIONES = ['Contado', 'Infonavit', 'Fovissste', 'Bancario', 'Cofinavit'];
 const fmt = (n) => `$${Number(n || 0).toLocaleString('es-MX', { maximumFractionDigits: 0 })}`;
 
-const SEG_VACIO = {
-  valor_venta: 0, tipo_credito: 'Contado',
-  financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0,
-};
+const SEG_VACIO = { financiera_1_monto: 0, financiera_2_monto: 0, liberacion_monto: 0 };
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
@@ -32,15 +26,16 @@ export default function Cobranza({ miRol, miAgente }) {
   const isMobile = useIsMobile();
   const [desarrollos, setDesarrollos] = useState([]);
   const [unidades, setUnidades] = useState([]);
-  const [seguimientos, setSeguimientos] = useState({}); // unidad_id -> row
-  const [pagosPorUnidad, setPagosPorUnidad] = useState({}); // unidad_id -> [pagos]
-  const [compradores, setCompradores] = useState({});
+  const [seguimientos, setSeguimientos] = useState({});
+  const [pagosPorUnidad, setPagosPorUnidad] = useState({});
+  const [ventaPorUnidad, setVentaPorUnidad] = useState({}); // unidad_id -> {contacto_nombre, monto, tipo_compra}
   const [desarrolloSel, setDesarrolloSel] = useState('');
   const [cargando, setCargando] = useState(true);
   const [unidadAbierta, setUnidadAbierta] = useState(null);
   const [form, setForm] = useState(SEG_VACIO);
-  const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '' });
+  const [nuevoPago, setNuevoPago] = useState({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
   const [guardando, setGuardando] = useState(false);
+  const [subiendoComprobante, setSubiendoComprobante] = useState(false);
 
   useEffect(() => { cargarTodo(); }, []);
 
@@ -76,17 +71,17 @@ export default function Cobranza({ miRol, miAgente }) {
       setPagosPorUnidad(mapaPagos);
 
       const { data: movs } = await supabase.from('movimientos')
-        .select('unidad_id, contacto_nombre, monto, created_at')
+        .select('unidad_id, contacto_nombre, monto, tipo_compra, created_at')
         .eq('tipo', 'Vendida')
         .in('unidad_id', unidadIds)
         .order('created_at', { ascending: false });
-      const mapaComp = {};
-      (movs || []).forEach(m => { if (!mapaComp[m.unidad_id]) mapaComp[m.unidad_id] = m; });
-      setCompradores(mapaComp);
+      const mapaVenta = {};
+      (movs || []).forEach(m => { if (!mapaVenta[m.unidad_id]) mapaVenta[m.unidad_id] = m; });
+      setVentaPorUnidad(mapaVenta);
     } else {
       setSeguimientos({});
       setPagosPorUnidad({});
-      setCompradores({});
+      setVentaPorUnidad({});
     }
     setCargando(false);
   };
@@ -100,18 +95,18 @@ export default function Cobranza({ miRol, miAgente }) {
   const totalPagos = (unidadId) => (pagosPorUnidad[unidadId] || []).reduce((s, p) => s + Number(p.monto || 0), 0);
 
   const calc = (unidadId, s) => {
+    const valorVenta = Number(ventaPorUnidad[unidadId]?.monto || 0);
     const pagado = totalPagos(unidadId);
-    const diferenciaPorCubrir = Number(s.valor_venta || 0) - pagado;
+    const diferenciaPorCubrir = valorVenta - pagado;
     const saldoNeto = diferenciaPorCubrir - Number(s.financiera_1_monto || 0) - Number(s.financiera_2_monto || 0);
     const remanente = Number(s.financiera_1_monto || 0) + Number(s.financiera_2_monto || 0) - Number(s.liberacion_monto || 0);
-    return { pagado, diferenciaPorCubrir, saldoNeto, remanente };
+    return { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente };
   };
 
   const abrirUnidad = (u) => {
     setUnidadAbierta(u);
-    const s = seguimientos[u.id] || { ...SEG_VACIO, valor_venta: compradores[u.id]?.monto || 0 };
-    setForm({ ...SEG_VACIO, ...s });
-    setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '' });
+    setForm({ ...SEG_VACIO, ...(seguimientos[u.id] || {}) });
+    setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
   };
 
   const guardarSeguimiento = async () => {
@@ -120,8 +115,6 @@ export default function Cobranza({ miRol, miAgente }) {
     const payload = {
       unidad_id: unidadAbierta.id,
       desarrollo_id: unidadAbierta.desarrollo_id,
-      valor_venta: Number(form.valor_venta) || 0,
-      tipo_credito: form.tipo_credito,
       financiera_1_monto: Number(form.financiera_1_monto) || 0,
       financiera_2_monto: Number(form.financiera_2_monto) || 0,
       liberacion_monto: Number(form.liberacion_monto) || 0,
@@ -139,22 +132,75 @@ export default function Cobranza({ miRol, miAgente }) {
 
   const agregarPago = async () => {
     if (!nuevoPago.monto || Number(nuevoPago.monto) <= 0) return;
+    setSubiendoComprobante(true);
     const { data: { user } } = await supabase.auth.getUser();
+
+    let comprobantePath = null;
+    if (nuevoPago.archivo) {
+      const ext = nuevoPago.archivo.name.split('.').pop();
+      const path = `${unidadAbierta.id}/${Date.now()}.${ext}`;
+      const { error: errUpload } = await supabase.storage.from('cobranza').upload(path, nuevoPago.archivo);
+      if (!errUpload) comprobantePath = path;
+    }
+
     const { data, error } = await supabase.from('cobranza_pagos').insert([{
       unidad_id: unidadAbierta.id,
       fecha: nuevoPago.fecha,
       monto: Number(nuevoPago.monto),
+      comprobante_path: comprobantePath,
       capturado_por: user?.email || null,
     }]).select().single();
+    setSubiendoComprobante(false);
     if (!error && data) {
       setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: [...(prev[unidadAbierta.id] || []), data] }));
-      setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '' });
+      setNuevoPago({ fecha: new Date().toISOString().slice(0, 10), monto: '', archivo: null });
     }
   };
 
-  const eliminarPago = async (pagoId) => {
-    await supabase.from('cobranza_pagos').delete().eq('id', pagoId);
-    setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: (prev[unidadAbierta.id] || []).filter(p => p.id !== pagoId) }));
+  const eliminarPago = async (pago) => {
+    await supabase.from('cobranza_pagos').delete().eq('id', pago.id);
+    if (pago.comprobante_path) await supabase.storage.from('cobranza').remove([pago.comprobante_path]);
+    setPagosPorUnidad(prev => ({ ...prev, [unidadAbierta.id]: (prev[unidadAbierta.id] || []).filter(p => p.id !== pago.id) }));
+  };
+
+  const verComprobante = async (path) => {
+    const { data } = await supabase.storage.from('cobranza').createSignedUrl(path, 300);
+    if (data?.signedUrl) window.open(data.signedUrl, '_blank');
+  };
+
+  const descargarPDF = () => {
+    const { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente } = calc(unidadAbierta.id, form);
+    const venta = ventaPorUnidad[unidadAbierta.id] || {};
+    const pagos = pagosPorUnidad[unidadAbierta.id] || [];
+    const cliente = venta.contacto_nombre || 'Sin comprador registrado';
+
+    const doc = new jsPDF('p', 'mm', 'letter');
+    let y = 15;
+    doc.setFontSize(14); doc.text('Cobranza', 10, y); y += 8;
+    doc.setFontSize(10);
+    doc.text(`Cliente asignado: ${cliente}`, 10, y); y += 6;
+    doc.text(`Unidad: ${unidadAbierta.numero} — ${unidadAbierta.desarrollo_nombre}`, 10, y); y += 6;
+    doc.text(`Tipo de compra: ${venta.tipo_compra || '—'}`, 10, y); y += 6;
+    doc.text(`Valor de venta: ${fmt(valorVenta)}`, 10, y); y += 10;
+
+    doc.setFontSize(11); doc.text('Enganche y pagos', 10, y); y += 6;
+    doc.setFontSize(10);
+    if (pagos.length === 0) { doc.text('Sin abonos registrados', 10, y); y += 6; }
+    pagos.forEach(p => {
+      doc.text(`${p.fecha}   ${fmt(p.monto)}${p.comprobante_path ? '   (con comprobante)' : ''}`, 10, y);
+      y += 6;
+    });
+    doc.text(`Total abonado: ${fmt(pagado)}`, 10, y); y += 10;
+
+    doc.text(`Diferencia por cubrir: ${fmt(diferenciaPorCubrir)}`, 10, y); y += 8;
+    doc.text(`Financiera 1: ${fmt(form.financiera_1_monto)}`, 10, y); y += 6;
+    doc.text(`Financiera 2: ${fmt(form.financiera_2_monto)}`, 10, y); y += 6;
+    doc.text(`Liberación: ${fmt(form.liberacion_monto)}`, 10, y); y += 8;
+    doc.setFontSize(11);
+    doc.text(`Saldo neto: ${fmt(saldoNeto)}`, 10, y); y += 7;
+    doc.text(`Remanente: ${fmt(remanente)}`, 10, y);
+
+    doc.save(`${cliente} - Cobranza.pdf`);
   };
 
   return (
@@ -184,7 +230,7 @@ export default function Cobranza({ miRol, miAgente }) {
                 style={{ background: '#fff', border: '0.5px solid #e0e0e0', borderRadius: '10px', padding: '12px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1a1a2e' }}>{u.numero} — {u.desarrollo_nombre}</div>
-                  <div style={{ fontSize: '12px', color: '#888' }}>{compradores[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
+                  <div style={{ fontSize: '12px', color: '#888' }}>{ventaPorUnidad[u.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div style={{ fontSize: '12px', color: '#888' }}>Pagado: <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(pagado)}</span></div>
@@ -199,7 +245,8 @@ export default function Cobranza({ miRol, miAgente }) {
       )}
 
       {unidadAbierta && (() => {
-        const { pagado, diferenciaPorCubrir, saldoNeto, remanente } = calc(unidadAbierta.id, form);
+        const { valorVenta, pagado, diferenciaPorCubrir, saldoNeto, remanente } = calc(unidadAbierta.id, form);
+        const venta = ventaPorUnidad[unidadAbierta.id] || {};
         const pagos = pagosPorUnidad[unidadAbierta.id] || [];
         return (
           <div onClick={() => setUnidadAbierta(null)}
@@ -207,21 +254,16 @@ export default function Cobranza({ miRol, miAgente }) {
             <div onClick={e => e.stopPropagation()}
               style={{ background: '#fff', borderRadius: '14px', padding: '1.5rem', width: '100%', maxWidth: '520px', maxHeight: '90vh', overflowY: 'auto' }}>
               <div style={{ fontSize: '16px', fontWeight: '700', color: '#1a1a2e', marginBottom: '2px' }}>{unidadAbierta.numero} — {unidadAbierta.desarrollo_nombre}</div>
-              <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>{compradores[unidadAbierta.id]?.contacto_nombre || 'Sin comprador registrado'}</div>
+              <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>Cliente asignado: {venta.contacto_nombre || 'Sin comprador registrado'}</div>
 
-              <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Valor venta</label>
-                  <input type="number" value={form.valor_venta}
-                    onChange={e => setForm(f => ({ ...f, valor_venta: e.target.value }))}
-                    style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', boxSizing: 'border-box' }} />
+              <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                <div style={{ flex: 1, background: '#f9f9f9', borderRadius: '10px', padding: '10px' }}>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Valor venta</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>{fmt(valorVenta)}</div>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '12px', color: '#555', display: 'block', marginBottom: '4px' }}>Tipo de crédito</label>
-                  <select value={form.tipo_credito} onChange={e => setForm(f => ({ ...f, tipo_credito: e.target.value }))}
-                    style={{ width: '100%', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', background: '#fff' }}>
-                    {TIPO_CREDITO_OPCIONES.map(o => <option key={o} value={o}>{o}</option>)}
-                  </select>
+                <div style={{ flex: 1, background: '#f9f9f9', borderRadius: '10px', padding: '10px' }}>
+                  <div style={{ fontSize: '11px', color: '#888' }}>Tipo de compra</div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: '#1a1a2e' }}>{venta.tipo_compra || '—'}</div>
                 </div>
               </div>
 
@@ -232,26 +274,31 @@ export default function Cobranza({ miRol, miAgente }) {
                     <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '0.5px solid #f0f0f0', fontSize: '13px' }}>
                       <span style={{ color: '#888' }}>{p.fecha}</span>
                       <span style={{ color: '#1a1a2e', fontWeight: '600' }}>{fmt(p.monto)}</span>
-                      <button onClick={() => eliminarPago(p.id)}
+                      {p.comprobante_path
+                        ? <button onClick={() => verComprobante(p.comprobante_path)} style={{ border: 'none', background: 'none', color: '#3B82F6', cursor: 'pointer', fontSize: '12px' }}>Ver comprobante</button>
+                        : <span style={{ fontSize: '11px', color: '#bbb' }}>Sin comprobante</span>}
+                      <button onClick={() => eliminarPago(p)}
                         style={{ border: 'none', background: 'none', color: '#EF4444', cursor: 'pointer', fontSize: '12px' }}>Eliminar</button>
                     </div>
                   ))}
                 </div>
               )}
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
                 <input type="date" value={nuevoPago.fecha} onChange={e => setNuevoPago(p => ({ ...p, fecha: e.target.value }))}
-                  style={{ flex: 1, padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                  style={{ flex: 1, minWidth: '120px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
                 <input type="number" placeholder="Monto" value={nuevoPago.monto} onChange={e => setNuevoPago(p => ({ ...p, monto: e.target.value }))}
-                  style={{ flex: 1, padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
-                <button onClick={agregarPago}
+                  style={{ flex: 1, minWidth: '90px', padding: '8px 10px', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px' }} />
+                <input type="file" onChange={e => setNuevoPago(p => ({ ...p, archivo: e.target.files[0] || null }))}
+                  style={{ flex: 1, minWidth: '140px', fontSize: '12px' }} />
+                <button onClick={agregarPago} disabled={subiendoComprobante}
                   style={{ padding: '8px 14px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-                  + Agregar
+                  {subiendoComprobante ? 'Subiendo...' : '+ Agregar'}
                 </button>
               </div>
               <div style={{ fontSize: '12px', color: '#888', marginBottom: '16px' }}>Total abonado: <strong style={{ color: '#1a1a2e' }}>{fmt(pagado)}</strong></div>
 
               <div style={{ background: '#f9f9f9', borderRadius: '10px', padding: '12px', fontSize: '13px', marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#555' }}>Diferencia por cubrir</span>
                   <span style={{ fontWeight: '600' }}>{fmt(diferenciaPorCubrir)}</span>
                 </div>
@@ -289,7 +336,7 @@ export default function Cobranza({ miRol, miAgente }) {
                 </div>
               </div>
 
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
                 <button onClick={() => setUnidadAbierta(null)}
                   style={{ flex: 1, padding: '10px', background: '#fff', color: '#666', border: '0.5px solid #ddd', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
                   Cerrar
@@ -299,6 +346,10 @@ export default function Cobranza({ miRol, miAgente }) {
                   {guardando ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>
+              <button onClick={descargarPDF}
+                style={{ width: '100%', padding: '10px', background: '#1a1a2e', color: '#fff', border: 'none', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
+                ⬇ Descargar PDF
+              </button>
             </div>
           </div>
         );
