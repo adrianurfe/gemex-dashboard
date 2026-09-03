@@ -50,9 +50,10 @@ const MENU_POR_ROL = {
   'Gerente Operador': ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes', 'direccion'],
   // Mesa de Control — revisa expedientes de TODA la empresa (sin
   // restricción de desarrollo/equipo, a diferencia de los demás Gerentes).
-  // Sin Ranking Gemex, Contactos ni Agentes. Dentro de Dirección solo ve
-  // Movimientos e Historial (se filtra en submenuFiltrado más abajo).
-  'Mesa de Control':  ['negocios', 'desarrollos', 'expedientes', 'direccion'],
+  // Sin Ranking Gemex, Contactos, Agentes ni Negocios. Dentro de Dirección
+  // solo ve Movimientos, Historial y Titulación (se filtra en
+  // submenuFiltrado más abajo).
+  'Mesa de Control':  ['desarrollos', 'expedientes', 'direccion'],
   'Agente':      ['dashboard', 'contactos', 'negocios', 'desarrollos', 'expedientes'],
   'Desarrollador': ['contactos', 'desarrollos', 'direccion'],
   // FIX: roles de un solo módulo — solo entran a Dirección y ahí solo ven
@@ -152,10 +153,11 @@ function Sidebar({ active, onNav, onLogout, miAgente, miRol, isOpen, onClose, is
             const isActive = active === item.id || submenuActivo;
             const submenuFiltrado = (item.submenu || []).filter(s => {
               if (miRol === 'Desarrollador') return s.id === 'dashboard_dir';
-              // FIX: Mesa de Control solo entra a revisar Movimientos e
-              // Historial — sin Dashboard, Objetivos, Tendencias ni Buyer
-              // Persona (a diferencia de los demás Gerentes).
-              if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial';
+              // FIX: Mesa de Control entra a revisar Movimientos, Historial
+              // y Titulación (también se encargan de ese módulo) — sin
+              // Dashboard, Cobranza, Objetivos, Tendencias ni Buyer Persona
+              // (a diferencia de los demás Gerentes).
+              if (miRol === 'Mesa de Control') return s.id === 'movimientos' || s.id === 'historial' || s.id === 'titulacion';
               // FIX: Construcción y Tesorería son roles de un solo módulo
               // — dentro de Dirección solo ven su propia pantalla.
               if (miRol === 'Construcción') return s.id === 'construccion';
