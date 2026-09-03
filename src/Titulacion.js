@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from './supabase';
-import { expedienteAprobado } from './expedienteDocs';
 
 // FIX: Titulación ahora solo trabaja el Paso 2 (Titulación -> Escritura)
 // — el Paso 1 (Avance de obra, DTU, Lista para avalúo) lo captura el
 // módulo de Construcción, en la misma tabla titulacion_seguimiento, y
 // aquí se muestra nada más como referencia (solo lectura). Además, la
 // lista solo incluye unidades cuyo expediente (movimiento Apartado) ya
-// está completo y aprobado en el módulo de Expedientes — antes mostraba
-// cualquier unidad Vendida sin importar el expediente.
+// tiene la casilla "Expediente completo" activada por su responsable en
+// Expedientes — antes mostraba cualquier unidad Vendida sin importar el
+// expediente.
 const ROLES_GERENTE = ['Gerente Editor', 'Gerente Operador'];
 
 const PASO2 = [
@@ -97,28 +97,18 @@ export default function Titulacion({ miRol, miAgente }) {
       return;
     }
 
-    // FIX: el expediente vive en el movimiento tipo 'Apartado' — se
-    // necesita para saber tipo_compra/coacreditado (qué documentos
-    // aplican) y para cruzar contra expediente_documentos.
+    // FIX: el expediente vive en el movimiento tipo 'Apartado' —
+    // "expediente_completo" es una casilla que solo el responsable
+    // enciende/apaga en Expedientes; mientras no esté activa, la unidad
+    // no aparece aquí.
     const { data: apartados } = await supabase.from('movimientos')
-      .select('id, unidad_id, tipo_compra, tiene_coacreditado, created_at')
+      .select('id, unidad_id, expediente_completo, created_at')
       .eq('tipo', 'Apartado').in('unidad_id', unidadIds)
       .order('created_at', { ascending: false });
     const apartadoPorUnidad = {};
     (apartados || []).forEach(m => { if (!apartadoPorUnidad[m.unidad_id]) apartadoPorUnidad[m.unidad_id] = m; });
 
-    const movimientoIds = Object.values(apartadoPorUnidad).map(m => m.id);
-    const { data: docs } = movimientoIds.length > 0
-      ? await supabase.from('expediente_documentos').select('*').in('movimiento_id', movimientoIds)
-      : { data: [] };
-    const docsPorMovimiento = {};
-    (docs || []).forEach(d => { (docsPorMovimiento[d.movimiento_id] = docsPorMovimiento[d.movimiento_id] || {})[d.tipo_documento] = d; });
-
-    const invConExpediente = invBase.filter(u => {
-      const mov = apartadoPorUnidad[u.id];
-      if (!mov) return false;
-      return expedienteAprobado(mov, docsPorMovimiento[mov.id] || {});
-    });
+    const invConExpediente = invBase.filter(u => !!apartadoPorUnidad[u.id]?.expediente_completo);
     setUnidades(invConExpediente);
 
     const idsConExpediente = invConExpediente.map(u => u.id);
@@ -188,7 +178,7 @@ export default function Titulacion({ miRol, miAgente }) {
   return (
     <div style={{ padding: isMobile ? '1rem' : '2rem' }}>
       <h2 style={{ fontSize: isMobile ? '16px' : '20px', fontWeight: '500', color: '#1a1a2e', marginBottom: '4px' }}>Titulación</h2>
-      <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Unidades vendidas con expediente aprobado, hasta escrituración</div>
+      <div style={{ fontSize: '12px', color: '#888', marginBottom: '1rem' }}>Unidades vendidas con expediente completo, hasta escrituración</div>
 
       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem' }}>
         <select value={desarrolloSel} onChange={e => setDesarrolloSel(e.target.value)}
@@ -215,7 +205,7 @@ export default function Titulacion({ miRol, miAgente }) {
       {cargando ? (
         <div style={{ color: '#888', fontSize: '13px' }}>Cargando...</div>
       ) : unidadesVisibles.length === 0 ? (
-        <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades con expediente aprobado que coincidan con el filtro.</div>
+        <div style={{ color: '#888', fontSize: '13px' }}>No hay unidades con expediente completo que coincidan con el filtro.</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {unidadesVisibles.map(u => {
